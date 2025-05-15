@@ -28,7 +28,7 @@ git clone https://github.com/yourusername/real-time-scoring-system.git
 cd real-time-scoring-system
 npm install
 npm run dev
-
+```
 
 # Real-Time Scoring System
 
@@ -60,3 +60,4 @@ git clone https://github.com/yourusername/real-time-scoring-system.git
 cd real-time-scoring-system
 npm install
 npm run dev
+```
