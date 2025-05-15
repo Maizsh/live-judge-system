@@ -156,13 +156,18 @@ const getPreviewScores = (scores) => {
 
 const scoreTableData = computed(() => {
   return store.contestants.map(contestant => {
-    const scoreDetails = store.getContestantScoreDetails(contestant.id)
+    const details = store.getContestantScoreDetails(contestant.id)
     const finalScore = store.calculateFinalScore(contestant.id)
+    console.log(`选手 ${contestant.id} 得分详情:`, {
+      details,
+      finalScore,
+      rawScores: store.scores[contestant.id] || {}
+    })
     
     return {
       contestantId: contestant.id,
       name: contestant.name,
-      scoreDetails,
+      scoreDetails: details,
       finalScore
     }
   })

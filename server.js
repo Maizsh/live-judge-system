@@ -17,19 +17,21 @@ const competitionState = {
   judgesCount: 0,
   contestantsCount: 0,
   currentContestant: 1,
-  judges: new Set(),
+  judges: new Map(), // 使用 Map 存储评委编号和 socket.id 的映射
   scores: {},
   contestants: []
 };
 
 // 广播比赛状态给所有客户端
 function broadcastState() {
+  const occupiedJudges = Array.from(competitionState.judges.keys());
+  console.log('广播状态 - 当前评委:', occupiedJudges);
   io.emit('syncState', {
     isStarted: competitionState.isStarted,
     judgesCount: competitionState.judgesCount,
     contestantsCount: competitionState.contestantsCount,
     currentContestant: competitionState.currentContestant,
-    judges: Array.from(competitionState.judges).length,
+    judges: occupiedJudges,
     scores: competitionState.scores,
     contestants: competitionState.contestants
   });
@@ -39,26 +41,52 @@ io.on('connection', (socket) => {
   console.log('用户已连接:', socket.id);
 
   // 立即发送当前比赛状态给新连接的客户端
+  const occupiedJudges = Array.from(competitionState.judges.keys());
   socket.emit('syncState', {
     isStarted: competitionState.isStarted,
     judgesCount: competitionState.judgesCount,
     contestantsCount: competitionState.contestantsCount,
     currentContestant: competitionState.currentContestant,
-    judges: Array.from(competitionState.judges).length,
+    judges: occupiedJudges,
     scores: competitionState.scores,
     contestants: competitionState.contestants
   });
 
   // 处理评委登录
   socket.on('judgeLogin', (data) => {
-    if (competitionState.judges.size < competitionState.judgesCount) {
-      competitionState.judges.add(socket.id);
-      socket.judgeId = competitionState.judges.size;
-      socket.emit('loginSuccess', { judgeId: socket.judgeId });
-      io.emit('judgeUpdate', { judgesCount: competitionState.judges.size });
-      broadcastState();
-    } else {
+    const judgeNumber = data.judgeNumber;
+    console.log(`评委 ${judgeNumber} 尝试登录`);
+    
+    // 检查评委编号是否已被占用
+    if (competitionState.judges.has(judgeNumber)) {
+      console.log(`评委 ${judgeNumber} 登录失败：编号已被占用`);
+      socket.emit('loginFailed', { message: '该评委编号已被占用' });
+      return;
+    }
+
+    // 检查是否还有评委名额
+    if (competitionState.judges.size >= competitionState.judgesCount) {
+      console.log(`评委 ${judgeNumber} 登录失败：评委数量已满`);
       socket.emit('loginFailed', { message: '评委数量已满' });
+      return;
+    }
+
+    // 记录评委信息
+    competitionState.judges.set(judgeNumber, socket.id);
+    socket.judgeId = judgeNumber;
+    
+    console.log(`评委 ${judgeNumber} 登录成功`);
+    socket.emit('loginSuccess', { judgeId: judgeNumber });
+    broadcastState();
+  });
+
+  // 处理评委退出
+  socket.on('judgeLogout', () => {
+    if (socket.judgeId) {
+      console.log(`评委 ${socket.judgeId} 主动退出`);
+      competitionState.judges.delete(socket.judgeId);
+      socket.judgeId = null;
+      broadcastState();
     }
   });
 
@@ -106,11 +134,14 @@ io.on('connection', (socket) => {
 
   // 处理断开连接
   socket.on('disconnect', () => {
-    console.log('用户已断开:', socket.id);
+    console.log('用户断开连接:', socket.id);
     if (socket.judgeId) {
-      competitionState.judges.delete(socket.id);
-      io.emit('judgeUpdate', { judgesCount: competitionState.judges.size });
-      broadcastState();
+      // 检查是否是当前评委的 socket
+      if (competitionState.judges.get(socket.judgeId) === socket.id) {
+        console.log(`评委 ${socket.judgeId} 断开连接，释放编号`);
+        competitionState.judges.delete(socket.judgeId);
+        broadcastState();
+      }
     }
   });
 });

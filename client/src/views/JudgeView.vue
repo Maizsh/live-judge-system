@@ -35,6 +35,9 @@
         <div v-else class="scoring-section">
           <div class="judge-info">
             <el-tag size="large">评委 {{ judgeId }} 号</el-tag>
+            <el-button type="danger" @click="handleLogout" size="small">
+              退出登录
+            </el-button>
           </div>
 
           <div class="current-contestant" v-if="store.competitionStarted">
@@ -103,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useCompetitionStore } from '../stores/competition'
 import { ElMessage } from 'element-plus'
 
@@ -141,14 +144,16 @@ const scoreHistory = computed(() => {
 
 // 监听比赛状态变化
 watch(() => store.competitionStarted, (newVal) => {
-  if (!newVal) {
+  if (!newVal && judgeId.value) {
     ElMessage.warning('比赛已结束')
     judgeId.value = null
   }
 })
 
 onMounted(() => {
-  store.initializeSocket()
+  if (!store.socket) {
+    store.initializeSocket()
+  }
 })
 
 // 处理评委登录
@@ -158,23 +163,73 @@ const handleLogin = async () => {
     return
   }
 
+  // 确保 store.judges 是数组
+  if (!Array.isArray(store.judges)) {
+    console.error('评委列表不是数组:', store.judges)
+    ElMessage.error('系统错误：评委列表状态异常')
+    return
+  }
+
+  // 检查评委编号是否已被占用
+  if (store.judges.includes(loginForm.value.judgeNumber)) {
+    console.log('评委编号已被占用:', loginForm.value.judgeNumber)
+    console.log('当前评委列表:', store.judges)
+    ElMessage.warning('该评委编号已被占用')
+    return
+  }
+
   loginForm.value.loading = true
   try {
-    // 检查该评委号是否已被使用
-    const contestantScores = store.scores[store.currentContestant] || {}
-    if (contestantScores[loginForm.value.judgeNumber]) {
-      throw new Error('该评委编号已被使用')
-    }
+    // 等待登录结果
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('登录超时'))
+      }, 5000)
 
-    store.socket.emit('judgeLogin', { judgeNumber: loginForm.value.judgeNumber })
-    judgeId.value = loginForm.value.judgeNumber
+      const successHandler = (data) => {
+        clearTimeout(timeout)
+        if (data.judgeId === loginForm.value.judgeNumber) {
+          judgeId.value = data.judgeId
+          resolve()
+        }
+      }
+
+      const failHandler = (data) => {
+        clearTimeout(timeout)
+        reject(new Error(data.message))
+      }
+
+      store.socket.once('loginSuccess', successHandler)
+      store.socket.once('loginFailed', failHandler)
+
+      // 发送登录请求
+      store.socket.emit('judgeLogin', { judgeNumber: loginForm.value.judgeNumber })
+    })
+
     ElMessage.success('登录成功')
   } catch (error) {
+    console.error('登录失败:', error)
     ElMessage.error(error.message || '登录失败')
+    judgeId.value = null
   } finally {
     loginForm.value.loading = false
   }
 }
+
+// 处理评委退出
+const handleLogout = () => {
+  store.judgeLogout(judgeId.value)
+  judgeId.value = null
+  ElMessage.success('已退出登录')
+}
+
+// 监听断连事件
+watch(() => store.isConnected, (newVal) => {
+  if (!newVal && judgeId.value) {
+    ElMessage.error('与服务器断开连接，请刷新页面重新登录')
+    judgeId.value = null
+  }
+})
 
 // 提交分数
 const submitScore = () => {
@@ -191,6 +246,13 @@ const submitScore = () => {
 
   ElMessage.success('打分成功')
 }
+
+// 确保在组件卸载时退出登录
+onUnmounted(() => {
+  if (judgeId.value) {
+    store.judgeLogout(judgeId.value)
+  }
+})
 </script>
 
 <style scoped>
@@ -240,6 +302,10 @@ const submitScore = () => {
 .judge-info {
   margin-bottom: 20px;
   text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
 }
 
 .contestant-card {

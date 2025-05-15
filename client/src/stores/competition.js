@@ -9,7 +9,7 @@ export const useCompetitionStore = defineStore('competition', {
     judgesCount: 0,
     contestantsCount: 0,
     currentContestant: 1,
-    judges: [],
+    judges: [], // 存储已登录的评委编号
     scores: {},
     contestants: []
   }),
@@ -21,13 +21,17 @@ export const useCompetitionStore = defineStore('competition', {
       const contestantScores = Object.values(state.scores[contestantId] || {})
       console.log('该选手的所有分数:', contestantScores)
       
+      // 如果没有分数，返回0
+      if (contestantScores.length === 0) {
+        console.log('选手暂无评分，返回0.0')
+        return '0.0'
+      }
+      
       // 如果评分数量少于3个，返回所有分数的平均值
       if (contestantScores.length < 3) {
-        const average = contestantScores.length 
-          ? (contestantScores.reduce((a, b) => a + b, 0) / contestantScores.length).toFixed(1)
-          : '0.0'
-        console.log('评委数量少于3人，直接平均得分:', average)
-        return average
+        const average = contestantScores.reduce((a, b) => a + b, 0) / contestantScores.length
+        console.log('评委数量少于3人，直接平均得分:', average.toFixed(1))
+        return average.toFixed(1)
       }
       
       // 对分数进行排序
@@ -80,19 +84,30 @@ export const useCompetitionStore = defineStore('competition', {
       console.log('计算得到的平均分:', average.toFixed(1))
 
       return {
-        allScores: contestantScores,
+        allScores: state.scores[contestantId] || {}, // 返回原始的评委-分数映射
         validScoresCount: contestantScores.length,
         lowestScore,
         highestScore,
         usedScores,
         average: average.toFixed(1)
       }
+    },
+
+    // 检查评委编号是否已被占用
+    isJudgeOccupied: (state) => (judgeNumber) => {
+      return state.judges.includes(judgeNumber)
     }
   },
   
   actions: {
     initializeSocket() {
+      if (this.socket) {
+        console.log('Socket 已存在，重用现有连接');
+        return;
+      }
+
       this.socket = io('http://localhost:3000')
+      console.log('初始化 Socket 连接');
       
       this.socket.on('connect', () => {
         this.isConnected = true
@@ -102,6 +117,7 @@ export const useCompetitionStore = defineStore('competition', {
       this.socket.on('disconnect', () => {
         this.isConnected = false
         console.log('与服务器断开连接')
+        this.judges = [] // 断连时清空评委列表
       })
 
       // 处理服务器状态同步
@@ -111,39 +127,31 @@ export const useCompetitionStore = defineStore('competition', {
         this.judgesCount = state.judgesCount
         this.contestantsCount = state.contestantsCount
         this.currentContestant = state.currentContestant
-        this.scores = state.scores
-        this.contestants = state.contestants
-        if (state.judges > 0) {
-          this.judges = Array.from({ length: state.judges }, (_, i) => i + 1)
-        } else {
-          this.judges = []
-        }
-        
-        // 当收到新状态时，重新计算所有选手的分数
-        if (this.contestants.length > 0) {
-          console.log('重新计算所有选手的分数')
-          this.contestants.forEach(contestant => {
-            const score = this.calculateFinalScore(contestant.id)
-            console.log('选手', contestant.id, '的最终得分:', score)
-          })
-        }
-      })
-
-      this.socket.on('judgeUpdate', (data) => {
-        console.log('评委数量更新:', data)
-        if (data.judgesCount > 0) {
-          this.judges = Array.from({ length: data.judgesCount }, (_, i) => i + 1)
-        } else {
-          this.judges = []
-        }
+        this.scores = state.scores || {}
+        this.contestants = state.contestants || []
+        this.judges = Array.isArray(state.judges) ? state.judges : []
+        console.log('更新评委列表:', this.judges)
       })
 
       this.socket.on('loginSuccess', (data) => {
         console.log('评委登录成功:', data)
-        if (!this.judges.includes(data.judgeId)) {
+        if (data.judgeId && !this.judges.includes(data.judgeId)) {
           this.judges.push(data.judgeId)
+          console.log('更新评委列表:', this.judges)
         }
       })
+
+      this.socket.on('loginFailed', (data) => {
+        console.log('评委登录失败:', data.message)
+      })
+    },
+    
+    // 评委退出
+    judgeLogout(judgeId) {
+      console.log('评委退出:', judgeId)
+      if (this.socket && judgeId) {
+        this.socket.emit('judgeLogout')
+      }
     },
     
     setupCompetition(judgesCount, contestantsCount) {
@@ -155,6 +163,7 @@ export const useCompetitionStore = defineStore('competition', {
         name: '选手' + (i + 1)
       }))
       this.scores = {}
+      this.judges = [] // 重置评委列表
     },
     
     startCompetition() {
@@ -168,6 +177,7 @@ export const useCompetitionStore = defineStore('competition', {
     endCompetition() {
       console.log('结束比赛')
       this.socket?.emit('endCompetition')
+      this.judges = [] // 结束比赛时清空评委列表
     },
     
     nextContestant() {
