@@ -3,7 +3,7 @@
 一个基于 Web 的实时评分系统，适用于比赛或评选场景。评委可对多位选手进行打分，系统会自动去除最高分和最低分，计算平均得分。
 
 ## 功能特点
-
+- 有大屏展示
 - 多位评委实时打分  
 - 自动去除最高分和最低分  
 - 实时结果更新  
@@ -21,7 +21,13 @@
 
 1. 克隆仓库  
 2. 安装依赖  
-3. 启动开发服务器  
+3. 启动开发服务器
+   
+```bash
+git clone https://github.com/yourusername/real-time-scoring-system.git
+cd real-time-scoring-system
+npm install
+npm run dev
 
 
 # Real-Time Scoring System
