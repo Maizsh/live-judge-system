@@ -45,9 +45,45 @@
               </template>
 
               <!-- 最终得分 -->
-              <div v-else class="final-score">
-                <div class="final-label">最终得分</div>
-                <div class="final-value">{{ currentContestantDetails.average }}</div>
+              <div v-else class="final-score-container">
+                <!-- 左侧最终得分 -->
+                <div class="final-score-left">
+                  <div class="final-label">最终得分</div>
+                  <div class="final-value">{{ currentContestantDetails.average }}</div>
+                </div>
+
+                <!-- 右侧得分详情 -->
+                <div class="final-score-right">
+                  <!-- 最高分和最低分 -->
+                  <div class="minmax-scores">
+                    <div class="score-item highest">
+                      <div class="score-label">最高分</div>
+                      <div class="score-value">{{ currentContestantDetails.highestScore }}</div>
+                    </div>
+                    <div class="score-item lowest">
+                      <div class="score-label">最低分</div>
+                      <div class="score-value">{{ currentContestantDetails.lowestScore }}</div>
+                    </div>
+                  </div>
+
+                  <!-- 所有评委打分 -->
+                  <div class="all-scores">
+                    <div class="scores-label">评委打分</div>
+                    <div class="scores-grid">
+                      <div 
+                        v-for="(score, judgeId) in currentContestantDetails.allScores" 
+                        :key="judgeId"
+                        class="judge-score"
+                        :class="{
+                          'removed': isScoreRemoved(score, currentContestantDetails)
+                        }"
+                      >
+                        <span class="judge-id">{{ judgeId }}号</span>
+                        <span class="score">{{ score }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -227,9 +263,25 @@ onMounted(() => {
   font-weight: bold;
 }
 
-/* 最终得分样式 */
-.final-score {
-  text-align: center;
+/* 最终得分容器样式 */
+.final-score-container {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 40% 60%;
+  gap: 2vw;
+  padding: 2vh 2vw;
+}
+
+/* 左侧最终得分样式 */
+.final-score-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1vw;
+  padding: 2vh;
 }
 
 .final-label {
@@ -242,6 +294,96 @@ onMounted(() => {
   font-size: 10vw;
   font-weight: bold;
   text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+/* 右侧得分详情样式 */
+.final-score-right {
+  display: flex;
+  flex-direction: column;
+  gap: 2vh;
+}
+
+/* 最高分最低分样式 */
+.minmax-scores {
+  display: flex;
+  justify-content: space-between;
+  gap: 2vw;
+}
+
+.score-item {
+  flex: 1;
+  text-align: center;
+  padding: 1vh;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.5vw;
+}
+
+.score-item.highest {
+  border: 2px solid #f56c6c;
+}
+
+.score-item.lowest {
+  border: 2px solid #409eff;
+}
+
+.score-label {
+  font-size: 1.2vw;
+  opacity: 0.9;
+  margin-bottom: 0.5vh;
+}
+
+.score-value {
+  font-size: 2.5vw;
+  font-weight: bold;
+}
+
+/* 所有评委打分样式 */
+.all-scores {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.5vw;
+  padding: 1vh;
+}
+
+.scores-label {
+  font-size: 1.2vw;
+  opacity: 0.9;
+  margin-bottom: 1vh;
+  text-align: center;
+}
+
+.scores-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 0.5vw;
+  height: calc(100% - 3vh);
+}
+
+.judge-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.3vw;
+  padding: 0.5vh;
+  font-size: 1vw;
+}
+
+.judge-score.removed {
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.judge-id {
+  font-size: 0.8vw;
+  opacity: 0.9;
+}
+
+.score {
+  font-size: 1.2vw;
+  font-weight: bold;
 }
 
 @keyframes fadeIn {
