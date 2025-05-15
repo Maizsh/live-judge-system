@@ -57,6 +57,13 @@
             <el-button type="success" @click="exportResults">
               导出结果
             </el-button>
+
+            <el-button 
+              type="primary" 
+              @click="store.toggleRanking"
+              :disabled="!store.isAllContestantsScored">
+              {{ store.showRanking ? '隐藏排名' : '显示排名' }}
+            </el-button>
           </div>
 
           <div class="scores-table" v-if="store.competitionStarted">
@@ -197,16 +204,48 @@ const endCompetition = async () => {
 
 const exportResults = () => {
   const results = store.exportResults()
-  const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = '比赛结果.json'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  ElMessage.success('结果已导出')
+  
+  // 准备 Excel 数据
+  const workbookData = [
+    // 表头
+    ['选手编号', '选手姓名', '最终得分', '有效分数数量', '最高分', '最低分', '所有评委打分']
+  ]
+
+  // 添加选手数据
+  results.summary.forEach(item => {
+    const allScores = Object.entries(item.scoreDetails.allScores)
+      .map(([judgeId, score]) => `评委${judgeId}: ${score}`)
+      .join(', ')
+
+    workbookData.push([
+      item.contestantId,
+      item.name,
+      item.finalScore,
+      item.scoreDetails.validScoresCount,
+      item.scoreDetails.highestScore || '-',
+      item.scoreDetails.lowestScore || '-',
+      allScores
+    ])
+  })
+
+  // 按最终得分排序
+  workbookData.slice(1).sort((a, b) => Number(b[2]) - Number(a[2]))
+
+  // 发送到服务器生成 Excel
+  store.socket?.emit('exportExcel', { data: workbookData }, (response) => {
+    if (response.success) {
+      // 创建下载链接
+      const link = document.createElement('a')
+      link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${response.file}`
+      link.download = '比赛成绩表.xlsx'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      ElMessage.success('成绩表已导出')
+    } else {
+      ElMessage.error('导出失败：' + response.error)
+    }
+  })
 }
 </script>
 

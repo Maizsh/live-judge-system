@@ -8,6 +8,7 @@ const io = require('socket.io')(http, {
   }
 });
 const cors = require('cors');
+const XLSX = require('xlsx');
 
 app.use(cors());
 
@@ -19,7 +20,8 @@ const competitionState = {
   currentContestant: 1,
   judges: new Map(), // 使用 Map 存储评委编号和 socket.id 的映射
   scores: {},
-  contestants: []
+  contestants: [],
+  showRanking: false // 添加排名显示状态
 };
 
 // 广播比赛状态给所有客户端
@@ -33,7 +35,8 @@ function broadcastState() {
     currentContestant: competitionState.currentContestant,
     judges: occupiedJudges,
     scores: competitionState.scores,
-    contestants: competitionState.contestants
+    contestants: competitionState.contestants,
+    showRanking: competitionState.showRanking // 添加排名显示状态
   });
 }
 
@@ -49,7 +52,8 @@ io.on('connection', (socket) => {
     currentContestant: competitionState.currentContestant,
     judges: occupiedJudges,
     scores: competitionState.scores,
-    contestants: competitionState.contestants
+    contestants: competitionState.contestants,
+    showRanking: competitionState.showRanking // 添加排名显示状态
   });
 
   // 处理评委登录
@@ -100,6 +104,7 @@ io.on('connection', (socket) => {
       id: i + 1,
       name: '选手' + (i + 1)
     }));
+    competitionState.showRanking = false; // 重置排名显示状态
     broadcastState();
   });
 
@@ -112,6 +117,7 @@ io.on('connection', (socket) => {
     competitionState.judgesCount = 0;
     competitionState.contestantsCount = 0;
     competitionState.currentContestant = 1;
+    competitionState.showRanking = false; // 重置排名显示状态
     broadcastState();
   });
 
@@ -132,6 +138,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 处理排名显示切换
+  socket.on('toggleRanking', (data) => {
+    console.log('切换排名显示状态:', data.showRanking);
+    competitionState.showRanking = data.showRanking;
+    broadcastState();
+  });
+
   // 处理断开连接
   socket.on('disconnect', () => {
     console.log('用户断开连接:', socket.id);
@@ -142,6 +155,43 @@ io.on('connection', (socket) => {
         competitionState.judges.delete(socket.judgeId);
         broadcastState();
       }
+    }
+  });
+
+  // 处理 Excel 导出
+  socket.on('exportExcel', (data, callback) => {
+    try {
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new();
+      
+      // 创建工作表
+      const worksheet = XLSX.utils.aoa_to_sheet(data.data);
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 10 },  // 选手编号
+        { wch: 12 },  // 选手姓名
+        { wch: 10 },  // 最终得分
+        { wch: 12 },  // 有效分数数量
+        { wch: 8 },   // 最高分
+        { wch: 8 },   // 最低分
+        { wch: 50 }   // 所有评委打分
+      ];
+      worksheet['!cols'] = colWidths;
+
+      // 将工作表添加到工作簿
+      XLSX.utils.book_append_sheet(workbook, worksheet, '比赛成绩');
+
+      // 生成 Excel 文件的二进制数据
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      // 转换为 base64
+      const base64 = excelBuffer.toString('base64');
+      
+      callback({ success: true, file: base64 });
+    } catch (error) {
+      console.error('导出 Excel 失败:', error);
+      callback({ success: false, error: error.message });
     }
   });
 });

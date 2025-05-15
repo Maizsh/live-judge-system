@@ -2,72 +2,74 @@
   <div class="display-view">
     <el-container>
       <el-header>
-        <h1>大屏展示</h1>
-        <div class="connection-status" :class="{ connected: store.isConnected }">
-          {{ store.isConnected ? '已连接' : '未连接' }}
+        <h1>第一届泰安市黄炎培职业教育创新创业大赛</h1>
+        <div v-if="!store.isConnected" class="connection-status">
+          未连接
         </div>
       </el-header>
 
       <el-main>
-        <div v-if="store.competitionStarted" class="display-content">
-          <!-- 当前选手信息 -->
-          <div class="current-contestant">
-            <h2>当前选手</h2>
-            <div class="contestant-number">{{ store.currentContestant }}</div>
-          </div>
-
-          <!-- 评分情况 -->
-          <div class="scoring-status">
-            <h3>评分情况</h3>
-            <!-- 未完成评分时显示的内容 -->
-            <template v-if="currentContestantDetails.validScoresCount < store.judgesCount">
-              <div class="score-info">
-                <div class="judges-count">
-                  已评分：{{ currentContestantDetails.validScoresCount }}/{{ store.judgesCount }}
-                </div>
-                <template v-if="currentContestantDetails.validScoresCount >= 3">
-                  <div class="score-details">
-                    <div class="score-item">
-                      <span class="label">最高分</span>
-                      <span class="score removed">{{ currentContestantDetails.highestScore }}</span>
-                    </div>
-                    <div class="score-item">
-                      <span class="label">最低分</span>
-                      <span class="score removed">{{ currentContestantDetails.lowestScore }}</span>
-                    </div>
-                  </div>
-                </template>
+        <template v-if="store.competitionStarted">
+          <!-- 比赛进行中且未显示排名 -->
+          <div v-if="!store.showRanking" class="display-content">
+            <!-- 顶部信息区 -->
+            <div class="top-info">
+              <div class="contestant-info">
+                <div class="contestant-label">当前选手</div>
+                <div class="contestant-number">{{ store.currentContestant }}</div>
               </div>
+              <div class="progress-info">
+                <div class="progress-label">评分进度</div>
+                <div class="progress-value">{{ currentContestantDetails.validScoresCount }}/{{ store.judgesCount }}</div>
+              </div>
+            </div>
 
-              <!-- 评委打分展示 -->
-              <div class="judges-scores">
-                <transition-group name="score">
+            <!-- 评分展示区域 -->
+            <div class="scoring-area">
+              <!-- 评分进行中 -->
+              <template v-if="currentContestantDetails.validScoresCount < store.judgesCount">
+                <div class="scores-display">
                   <div 
                     v-for="(score, judgeId) in currentContestantDetails.allScores" 
                     :key="judgeId"
-                    class="judge-score"
+                    class="score-card"
                     :class="{
-                      'removed': isScoreRemoved(score, currentContestantDetails)
+                      'removed': isScoreRemoved(score, currentContestantDetails),
+                      'active': !isScoreRemoved(score, currentContestantDetails)
                     }"
                   >
-                    <div class="judge-label">评委 {{ judgeId }} 号</div>
-                    <div class="score-value">{{ score }}</div>
+                    <div class="judge-number">{{ judgeId }}号评委</div>
+                    <div class="score-number">{{ score }}</div>
                   </div>
-                </transition-group>
-              </div>
-            </template>
+                </div>
+              </template>
 
-            <!-- 所有评委打完分后只显示最终得分 -->
-            <div v-else 
-                 class="final-score-container"
-                 :class="{'fade-in': currentContestantDetails.validScoresCount === store.judgesCount}">
-              <div class="final-score">
-                <h2>最终得分</h2>
-                <div class="score">{{ currentContestantDetails.average }}</div>
+              <!-- 最终得分 -->
+              <div v-else class="final-score">
+                <div class="final-label">最终得分</div>
+                <div class="final-value">{{ currentContestantDetails.average }}</div>
               </div>
             </div>
           </div>
-        </div>
+
+          <!-- 显示总排名 -->
+          <div v-else class="ranking-display">
+            <h2 class="ranking-title">总成绩排名</h2>
+            <div class="ranking-list">
+              <div 
+                v-for="(contestant, index) in sortedContestants" 
+                :key="contestant.number"
+                class="ranking-item"
+                :class="{'top-three': index < 3}"
+                :style="{'--index': index}"
+              >
+                <div class="rank-number">{{ index + 1 }}</div>
+                <div class="contestant-number">{{ contestant.number }}号</div>
+                <div class="final-score">{{ contestant.score }}</div>
+              </div>
+            </div>
+          </div>
+        </template>
 
         <div v-else class="waiting-message">
           <el-empty description="等待比赛开始..." />
@@ -83,12 +85,14 @@ import { useCompetitionStore } from '../stores/competition'
 
 const store = useCompetitionStore()
 
-// 获取当前选手的得分详情
 const currentContestantDetails = computed(() => {
   return store.getContestantScoreDetails(store.currentContestant)
 })
 
-// 判断分数是否被去除（最高分或最低分）
+const sortedContestants = computed(() => {
+  return store.getAllContestantsRanking()
+})
+
 const isScoreRemoved = (score, details) => {
   if (details.validScoresCount < 3) return false
   return score === details.highestScore || score === details.lowestScore
@@ -104,6 +108,11 @@ onMounted(() => {
   height: 100vh;
   background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
   color: white;
+  overflow: hidden;
+}
+
+.el-container {
+  height: 100vh;
 }
 
 .el-header {
@@ -111,208 +120,231 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  height: 60px !important;
+  padding: 0 3vw;
+  height: 10vh !important;
+}
+
+.el-header h1 {
+  font-size: 2.5vw;
+  font-weight: bold;
 }
 
 .connection-status {
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 1vh 1.5vw;
+  border-radius: 0.5vw;
   background-color: #f56c6c;
-}
-
-.connection-status.connected {
-  background-color: #67c23a;
+  font-size: 1.2vw;
+  animation: blink 1s infinite;
 }
 
 .el-main {
-  padding: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  height: 90vh;
+  padding: 2vh 3vw;
 }
 
 .display-content {
-  width: 100%;
-  max-width: 1200px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3vh;
+}
+
+/* 顶部信息区样式 */
+.top-info {
+  height: 20vh;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5vw;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1vw;
+}
+
+.contestant-info, .progress-info {
   text-align: center;
 }
 
-.current-contestant {
-  margin-bottom: 40px;
+.contestant-label, .progress-label {
+  font-size: 1.5vw;
+  opacity: 0.9;
+  margin-bottom: 2vh;
 }
 
 .contestant-number {
-  font-size: 8rem;
+  font-size: 5vw;
   font-weight: bold;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-  margin: 20px 0;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
 }
 
-.scoring-status {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 30px;
-  margin-top: 20px;
+.progress-value {
+  font-size: 3vw;
+  font-weight: bold;
 }
 
-.score-info {
-  margin: 20px 0;
-  font-size: 1.2rem;
-}
-
-.judges-count {
-  margin-bottom: 20px;
-  font-size: 1.5rem;
-}
-
-.score-details {
+/* 评分区域样式 */
+.scoring-area {
+  flex: 1;
   display: flex;
   justify-content: center;
-  gap: 40px;
-  margin: 20px 0;
+  align-items: center;
 }
 
-.score-item {
+.scores-display {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 1.5vw;
+  padding: 2vh 0;
+}
+
+.score-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1vw;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.label {
-  font-size: 1.2rem;
-  opacity: 0.8;
-}
-
-.score {
-  font-size: 2rem;
-  font-weight: bold;
-}
-
-.score.removed {
-  opacity: 0.5;
-  text-decoration: line-through;
-}
-
-.judges-scores {
-  display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
-  margin: 30px 0;
-}
-
-.judge-score {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 15px;
-  min-width: 150px;
+  align-items: center;
   transition: all 0.3s ease;
 }
 
-.judge-score.removed {
+.score-card.removed {
   opacity: 0.5;
-  background-color: rgba(255, 255, 255, 0.1);
 }
 
-.judge-label {
-  font-size: 1.1rem;
-  margin-bottom: 10px;
+.score-card.active {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.score-value {
-  font-size: 2rem;
+.judge-number {
+  font-size: 1.2vw;
+  margin-bottom: 1vh;
+}
+
+.score-number {
+  font-size: 2.5vw;
   font-weight: bold;
 }
 
-.final-score-container {
-  margin-top: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 300px;
-}
-
+/* 最终得分样式 */
 .final-score {
-  padding: 40px;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
   text-align: center;
-  box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
 }
 
-.final-score h2 {
-  margin-bottom: 30px;
-  font-size: 2.5rem;
-  color: rgba(255, 255, 255, 0.9);
+.final-label {
+  font-size: 3vw;
+  opacity: 0.9;
+  margin-bottom: 3vh;
 }
 
-.final-score .score {
-  font-size: 6rem;
+.final-value {
+  font-size: 10vw;
   font-weight: bold;
-  text-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
-  color: #fff;
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-h2 {
-  margin: 0;
-  font-size: 1.8rem;
-}
-
-h3 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.waiting-message {
-  color: white;
-  font-size: 1.5rem;
-}
-
-/* 动画效果 */
-.score-enter-active,
-.score-leave-active {
-  transition: all 0.5s ease;
-}
-
-.score-enter-from,
-.score-leave-to {
-  opacity: 0;
-  transform: translateY(30px);
-}
-
-.score-move {
-  transition: transform 0.5s ease;
-}
-
-/* 适配深色主题的 Element Plus Empty 组件 */
-:deep(.el-empty__description) {
-  color: white !important;
-}
-
-:deep(.el-empty__image svg path) {
-  fill: rgba(255, 255, 255, 0.3) !important;
-}
-
-/* 添加淡入动画效果 */
-.fade-in {
-  animation: fadeIn 1s ease-in;
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
 }
 
 @keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Element Plus 空状态样式覆盖 */
+:deep(.el-empty__description) {
+  color: white;
+  font-size: 2vw;
+}
+
+:deep(.el-empty__image) {
+  opacity: 0.7;
+}
+
+/* 添加排名相关样式 */
+.ranking-display {
+  height: 100%;
+  padding: 2vh 5vw;
+  display: flex;
+  flex-direction: column;
+  gap: 4vh;
+}
+
+.ranking-title {
+  font-size: 3vw;
+  text-align: center;
+  margin-bottom: 4vh;
+  font-weight: bold;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2vh;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ranking-item {
+  display: grid;
+  grid-template-columns: 15% 45% 40%;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2vh 3vw;
+  border-radius: 1vw;
+  font-size: 2vw;
+  transition: all 0.3s ease;
+  animation: slideIn 0.5s ease forwards;
+  animation-delay: calc(var(--index) * 0.1s);
+}
+
+.ranking-item.top-three {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.02);
+}
+
+.ranking-item:nth-child(1) {
+  background: linear-gradient(45deg, #FFD700 0%, rgba(255, 215, 0, 0.2) 100%);
+}
+
+.ranking-item:nth-child(2) {
+  background: linear-gradient(45deg, #C0C0C0 0%, rgba(192, 192, 192, 0.2) 100%);
+}
+
+.ranking-item:nth-child(3) {
+  background: linear-gradient(45deg, #CD7F32 0%, rgba(205, 127, 50, 0.2) 100%);
+}
+
+.rank-number {
+  font-size: 2.5vw;
+  font-weight: bold;
+  text-align: center;
+}
+
+.ranking-item .contestant-number {
+  font-size: 2vw;
+}
+
+.ranking-item .final-score {
+  font-size: 2.5vw;
+  font-weight: bold;
+  text-align: right;
+}
+
+@keyframes slideIn {
   from {
+    transform: translateX(-100%);
     opacity: 0;
-    transform: translateY(20px);
   }
   to {
+    transform: translateX(0);
     opacity: 1;
-    transform: translateY(0);
   }
 }
 </style> 

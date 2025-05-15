@@ -11,7 +11,8 @@ export const useCompetitionStore = defineStore('competition', {
     currentContestant: 1,
     judges: [], // 存储已登录的评委编号
     scores: {},
-    contestants: []
+    contestants: [],
+    showRanking: false, // 控制是否显示排名
   }),
   
   getters: {
@@ -96,7 +97,28 @@ export const useCompetitionStore = defineStore('competition', {
     // 检查评委编号是否已被占用
     isJudgeOccupied: (state) => (judgeNumber) => {
       return state.judges.includes(judgeNumber)
-    }
+    },
+
+    // 获取所有选手的排名
+    getAllContestantsRanking: (state) => () => {
+      // 获取所有选手的得分
+      const contestantsWithScores = state.contestants.map(contestant => ({
+        number: contestant.id,
+        name: contestant.name,
+        score: Number(state.calculateFinalScore(contestant.id))
+      }))
+
+      // 按分数降序排序
+      return contestantsWithScores.sort((a, b) => b.score - a.score)
+    },
+
+    // 判断是否所有选手都已完成打分
+    isAllContestantsScored: (state) => {
+      return state.contestants.every(contestant => {
+        const details = state.getContestantScoreDetails(contestant.id)
+        return details.validScoresCount === state.judgesCount
+      })
+    },
   },
   
   actions: {
@@ -130,6 +152,7 @@ export const useCompetitionStore = defineStore('competition', {
         this.scores = state.scores || {}
         this.contestants = state.contestants || []
         this.judges = Array.isArray(state.judges) ? state.judges : []
+        this.showRanking = state.showRanking || false
         console.log('更新评委列表:', this.judges)
       })
 
@@ -215,6 +238,11 @@ export const useCompetitionStore = defineStore('competition', {
       }
       console.log('完整比赛结果:', results)
       return results
-    }
+    },
+
+    toggleRanking() {
+      this.showRanking = !this.showRanking
+      this.socket?.emit('toggleRanking', { showRanking: this.showRanking })
+    },
   }
 }) 

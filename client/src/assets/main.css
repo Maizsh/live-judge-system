@@ -1,10 +1,77 @@
 @import './base.css';
 
+/* 全局样式重置 */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* 确保 app 根元素占满全屏 */
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 移除默认样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 基础字体大小设置 */
+:root {
+  --base-font-size: 16px;
+}
+
+/* 响应式字体大小 */
+@media screen and (max-width: 768px) {
+  :root {
+    --base-font-size: 14px;
+  }
+}
+
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --base-font-size: 15px;
+  }
+}
+
+@media screen and (min-width: 1025px) {
+  :root {
+    --base-font-size: 16px;
+  }
+}
+
+/* 设置基础字体大小 */
+html {
+  font-size: var(--base-font-size);
+}
+
+/* 移除滚动条但保持可滚动 */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 确保所有路由视图都能占满全屏 */
+.router-view {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Element Plus 组件全局样式覆盖 */
+.el-container {
+  height: 100%;
+  width: 100%;
 }
 
 a,
@@ -18,18 +85,5 @@ a,
 @media (hover: hover) {
   a:hover {
     background-color: hsla(160, 100%, 37%, 0.2);
-  }
-}
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
   }
 }
