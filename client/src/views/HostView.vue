@@ -156,31 +156,14 @@ const getPreviewScores = (scores) => {
 
 const scoreTableData = computed(() => {
   return store.contestants.map(contestant => {
-    const contestantScores = store.scores[contestant.id] || {}
-    const scores = Object.entries(contestantScores).reduce((acc, [judgeId, score]) => {
-      acc[judgeId] = score
-      return acc
-    }, {})
+    const scoreDetails = store.getContestantScoreDetails(contestant.id)
+    const finalScore = store.calculateFinalScore(contestant.id)
     
-    const validScores = Object.values(scores).filter(score => score !== null && score !== undefined)
-    const average = validScores.length 
-      ? validScores.reduce((a, b) => a + b, 0) / validScores.length 
-      : 0
-
     return {
       contestantId: contestant.id,
       name: contestant.name,
-      scores,
-      validScoresCount: validScores.length,
-      averageScore: average.toFixed(2),
-      scoreDetails: {
-        validScoresCount: validScores.length,
-        highestScore: Math.max(...validScores),
-        lowestScore: Math.min(...validScores),
-        usedScores: validScores,
-        allScores: scores
-      },
-      finalScore: average.toFixed(2)
+      scoreDetails,
+      finalScore
     }
   })
 })
