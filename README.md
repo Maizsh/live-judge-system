@@ -23,11 +23,6 @@
 2. 安装依赖  
 3. 启动开发服务器  
 
-```bash
-git clone https://github.com/yourusername/real-time-scoring-system.git
-cd real-time-scoring-system
-npm install
-npm run dev
 
 # Real-Time Scoring System
 
