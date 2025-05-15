@@ -1,6 +1,15 @@
 import { defineStore } from 'pinia'
 import { io } from 'socket.io-client'
 
+// 获取当前环境的服务器地址
+const getServerUrl = () => {
+  if (import.meta.env.VITE_SERVER_URL) {
+    return import.meta.env.VITE_SERVER_URL
+  }
+  // 如果没有配置环境变量，则使用当前域名
+  return window.location.origin
+}
+
 export const useCompetitionStore = defineStore('competition', {
   state: () => ({
     socket: null,
@@ -128,19 +137,27 @@ export const useCompetitionStore = defineStore('competition', {
         return;
       }
 
-      this.socket = io('http://localhost:3000')
+      const serverUrl = getServerUrl();
+      console.log('连接到服务器:', serverUrl);
+      
+      this.socket = io(serverUrl, {
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 5000
+      });
+
       console.log('初始化 Socket 连接');
       
       this.socket.on('connect', () => {
-        this.isConnected = true
-        console.log('已连接到服务器')
-      })
+        this.isConnected = true;
+        console.log('已连接到服务器');
+      });
       
-      this.socket.on('disconnect', () => {
-        this.isConnected = false
-        console.log('与服务器断开连接')
-        this.judges = [] // 断连时清空评委列表
-      })
+      this.socket.on('connect_error', (error) => {
+        console.error('连接错误:', error);
+        this.isConnected = false;
+      });
 
       // 处理服务器状态同步
       this.socket.on('syncState', (state) => {

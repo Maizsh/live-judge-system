@@ -3,14 +3,39 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
   cors: {
-    origin: "http://localhost:5173", // Vue开发服务器的默认地址
-    methods: ["GET", "POST"]
-  }
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true,
+    transports: ['websocket', 'polling']
+  },
+  allowEIO3: true
 });
 const cors = require('cors');
 const XLSX = require('xlsx');
+const path = require('path');
 
-app.use(cors());
+// 配置 CORS
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
+
+// 配置安全headers
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
+// 静态文件托管
+app.use(express.static(path.join(__dirname, 'client/dist')));
+
+// 所有其他请求都返回 index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+});
 
 // 存储比赛状态
 const competitionState = {
@@ -197,6 +222,8 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-  console.log('服务器运行在端口 ' + PORT);
+const HOST = process.env.HOST || '0.0.0.0';
+
+http.listen(PORT, HOST, () => {
+  console.log(`服务器运行在 http://${HOST}:${PORT}`);
 }); 
