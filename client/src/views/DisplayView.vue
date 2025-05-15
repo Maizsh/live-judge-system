@@ -19,45 +19,52 @@
           <!-- 评分情况 -->
           <div class="scoring-status">
             <h3>评分情况</h3>
-            <div class="score-info">
-              <div class="judges-count">
-                已评分：{{ currentContestantDetails.validScoresCount }}/{{ store.judgesCount }}
+            <!-- 未完成评分时显示的内容 -->
+            <template v-if="currentContestantDetails.validScoresCount < store.judgesCount">
+              <div class="score-info">
+                <div class="judges-count">
+                  已评分：{{ currentContestantDetails.validScoresCount }}/{{ store.judgesCount }}
+                </div>
+                <template v-if="currentContestantDetails.validScoresCount >= 3">
+                  <div class="score-details">
+                    <div class="score-item">
+                      <span class="label">最高分</span>
+                      <span class="score removed">{{ currentContestantDetails.highestScore }}</span>
+                    </div>
+                    <div class="score-item">
+                      <span class="label">最低分</span>
+                      <span class="score removed">{{ currentContestantDetails.lowestScore }}</span>
+                    </div>
+                  </div>
+                </template>
               </div>
-              <template v-if="currentContestantDetails.validScoresCount >= 3">
-                <div class="score-details">
-                  <div class="score-item">
-                    <span class="label">最高分</span>
-                    <span class="score removed">{{ currentContestantDetails.highestScore }}</span>
-                  </div>
-                  <div class="score-item">
-                    <span class="label">最低分</span>
-                    <span class="score removed">{{ currentContestantDetails.lowestScore }}</span>
-                  </div>
-                </div>
-              </template>
-            </div>
 
-            <!-- 评委打分展示 -->
-            <div class="judges-scores">
-              <transition-group name="score">
-                <div 
-                  v-for="(score, judgeId) in currentContestantDetails.allScores" 
-                  :key="judgeId"
-                  class="judge-score"
-                  :class="{
-                    'removed': isScoreRemoved(score, currentContestantDetails)
-                  }"
-                >
-                  <div class="judge-label">评委 {{ judgeId }} 号</div>
-                  <div class="score-value">{{ score }}</div>
-                </div>
-              </transition-group>
-            </div>
+              <!-- 评委打分展示 -->
+              <div class="judges-scores">
+                <transition-group name="score">
+                  <div 
+                    v-for="(score, judgeId) in currentContestantDetails.allScores" 
+                    :key="judgeId"
+                    class="judge-score"
+                    :class="{
+                      'removed': isScoreRemoved(score, currentContestantDetails)
+                    }"
+                  >
+                    <div class="judge-label">评委 {{ judgeId }} 号</div>
+                    <div class="score-value">{{ score }}</div>
+                  </div>
+                </transition-group>
+              </div>
+            </template>
 
-            <!-- 最终得分 -->
-            <div class="final-score">
-              <h2>最终得分</h2>
-              <div class="score">{{ finalScore }}</div>
+            <!-- 所有评委打完分后只显示最终得分 -->
+            <div v-else 
+                 class="final-score-container"
+                 :class="{'fade-in': currentContestantDetails.validScoresCount === store.judgesCount}">
+              <div class="final-score">
+                <h2>最终得分</h2>
+                <div class="score">{{ currentContestantDetails.average }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -79,11 +86,6 @@ const store = useCompetitionStore()
 // 获取当前选手的得分详情
 const currentContestantDetails = computed(() => {
   return store.getContestantScoreDetails(store.currentContestant)
-})
-
-// 计算最终得分
-const finalScore = computed(() => {
-  return store.calculateFinalScore(store.currentContestant)
 })
 
 // 判断分数是否被去除（最高分或最低分）
@@ -224,22 +226,33 @@ onMounted(() => {
   font-weight: bold;
 }
 
-.final-score {
+.final-score-container {
   margin-top: 40px;
-  padding: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.final-score {
+  padding: 40px;
   background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
 }
 
 .final-score h2 {
-  margin-bottom: 20px;
-  font-size: 2rem;
+  margin-bottom: 30px;
+  font-size: 2.5rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .final-score .score {
-  font-size: 5rem;
+  font-size: 6rem;
   font-weight: bold;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+  color: #fff;
 }
 
 h1 {
@@ -285,5 +298,21 @@ h3 {
 
 :deep(.el-empty__image svg path) {
   fill: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 添加淡入动画效果 */
+.fade-in {
+  animation: fadeIn 1s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style> 
