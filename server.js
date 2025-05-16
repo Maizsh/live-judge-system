@@ -155,10 +155,18 @@ io.on('connection', (socket) => {
   // 处理评分提交
   socket.on('submitScore', (data) => {
     if (socket.judgeId && competitionState.isStarted) {
+      // 检查该评委是否已经对这个选手打过分
+      if (competitionState.scores[data.contestantId] && 
+          competitionState.scores[data.contestantId][socket.judgeId] !== undefined) {
+        socket.emit('submitFailed', { message: '已经对该选手打过分，不能修改' });
+        return;
+      }
+      
       if (!competitionState.scores[data.contestantId]) {
         competitionState.scores[data.contestantId] = {};
       }
       competitionState.scores[data.contestantId][socket.judgeId] = data.score;
+      socket.emit('submitSuccess', { message: '打分成功' });
       broadcastState();
     }
   });

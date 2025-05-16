@@ -154,6 +154,15 @@ onMounted(() => {
   if (!store.socket) {
     store.initializeSocket()
   }
+
+  // 添加提交失败和成功的事件监听
+  store.socket.on('submitFailed', (data) => {
+    ElMessage.error(data.message);
+  });
+
+  store.socket.on('submitSuccess', (data) => {
+    ElMessage.success(data.message);
+  });
 })
 
 // 处理评委登录
@@ -244,13 +253,17 @@ const submitScore = () => {
     score: scoreForm.value.score
   })
 
-  ElMessage.success('打分成功')
+
 }
 
-// 确保在组件卸载时退出登录
+// 确保在组件卸载时移除事件监听
 onUnmounted(() => {
-  if (judgeId.value) {
-    store.judgeLogout(judgeId.value)
+  if (store.socket) {
+    store.socket.off('submitFailed');
+    store.socket.off('submitSuccess');
+    if (judgeId.value) {
+      store.judgeLogout(judgeId.value)
+    }
   }
 })
 </script>
