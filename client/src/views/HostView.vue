@@ -71,6 +71,22 @@
               :disabled="!store.isAllContestantsScored">
               {{ store.showRanking ? '隐藏排名' : '显示排名' }}
             </el-button>
+
+            <el-button 
+              type="warning" 
+              @click="stopScoreEdit"
+              :disabled="!store.competitionStarted || !store.allowScoreEdit"
+            >
+              停止评分
+            </el-button>
+
+            <el-button 
+              type="success" 
+              @click="startScoreEdit"
+              :disabled="!store.competitionStarted || store.allowScoreEdit"
+            >
+              开始评分
+            </el-button>
           </div>
 
           <div class="scores-table" v-if="store.competitionStarted">
@@ -202,6 +218,10 @@ const scoreTableData = computed(() => {
 
 onMounted(() => {
   store.initializeSocket()
+  // 监听评分锁定状态
+  store.socket?.on('syncState', (state) => {
+    store.allowScoreEdit = state.allowScoreEdit
+  })
 })
 
 const setupCompetition = () => {
@@ -266,6 +286,14 @@ const exportResults = () => {
       ElMessage.error('导出失败：' + response.error)
     }
   })
+}
+
+const stopScoreEdit = () => {
+  store.socket?.emit('stopScoreEdit')
+}
+
+const startScoreEdit = () => {
+  store.socket?.emit('startScoreEdit')
 }
 </script>
 

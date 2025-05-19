@@ -34,8 +34,8 @@
                     :key="judgeId"
                     class="score-card"
                     :class="{
-                      'removed': isScoreRemoved(score, currentContestantDetails),
-                      'active': !isScoreRemoved(score, currentContestantDetails)
+                      'removed': isScoreRemoved(score, currentContestantDetails, judgeId),
+                      'active': !isScoreRemoved(score, currentContestantDetails, judgeId)
                     }"
                   >
                     <div class="judge-number">{{ judgeId }}号评委</div>
@@ -75,7 +75,7 @@
                         :key="judgeId"
                         class="judge-score"
                         :class="{
-                          'removed': isScoreRemoved(score, currentContestantDetails)
+                          'removed': isScoreRemoved(score, currentContestantDetails, judgeId)
                         }"
                       >
                         <span class="judge-id">{{ judgeId }}号</span>
@@ -129,9 +129,45 @@ const sortedContestants = computed(() => {
   return store.getAllContestantsRanking()
 })
 
-const isScoreRemoved = (score, details) => {
+const isScoreRemoved = (score, details, judgeId) => {
   if (details.validScoresCount < 3) return false
-  return score === details.highestScore || score === details.lowestScore
+  
+  // 获取所有分数和评委ID
+  const scores = Object.entries(details.allScores)
+  
+  // 如果是最高分
+  if (score === details.highestScore) {
+    // 找到所有最高分的评委ID
+    const highestJudges = scores
+      .filter(([_, s]) => s === details.highestScore)
+      .map(([judgeId]) => judgeId)
+      .sort()
+    
+    console.log('最高分评委列表:', highestJudges)
+    console.log('当前评委ID:', judgeId)
+    console.log('是否应该显示灰色:', judgeId === highestJudges[0])
+    
+    // 只有当当前评委ID是最高分评委中ID最小的那个时，才显示为灰色
+    return judgeId === highestJudges[0]
+  }
+  
+  // 如果是最低分
+  if (score === details.lowestScore) {
+    // 找到所有最低分的评委ID
+    const lowestJudges = scores
+      .filter(([_, s]) => s === details.lowestScore)
+      .map(([judgeId]) => judgeId)
+      .sort()
+    
+    console.log('最低分评委列表:', lowestJudges)
+    console.log('当前评委ID:', judgeId)
+    console.log('是否应该显示灰色:', judgeId === lowestJudges[0])
+    
+    // 只有当当前评委ID是最低分评委中ID最小的那个时，才显示为灰色
+    return judgeId === lowestJudges[0]
+  }
+  
+  return false
 }
 
 onMounted(() => {
@@ -271,6 +307,7 @@ onMounted(() => {
   grid-template-columns: 40% 60%;
   gap: 2vw;
   padding: 2vh 2vw;
+  padding-left: 0;
 }
 
 /* 左侧最终得分样式 */

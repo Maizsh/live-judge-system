@@ -56,25 +56,32 @@
               </template>
               
               <div class="score-input">
-                <el-form :model="scoreForm" label-width="80px">
-                  <el-form-item label="评分">
-                    <el-input-number 
-                      v-model="scoreForm.score" 
-                      :min="0" 
-                      :max="100" 
-                      :step="0.5"
-                      :disabled="!store.competitionStarted"
-                    />
+                <el-form :model="scoreForm" label-width="100px">
+                  <el-form-item label="可行性 (分)">
+                    <el-input-number v-model="scoreForm.feasibility" :min="0" :max="30" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <div class="score-desc">指对参赛项目的主要内容和配套条件,如市场需求、资源供应、资金筹措、盈利能力等,从技术、经济等方面进行调查研究和分析比较,并提出该项目是否值得投资、如何进行建设的咨询意见。优秀25-30分，良好15-25分，一般0-15分。</div>
+                  </el-form-item>
+                  <el-form-item label="创新性 (25分)">
+                    <el-input-number v-model="scoreForm.innovation" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <div class="score-desc">指提交的参赛项目是否具有一定的技术含量,或具有低碳、环保、节能等方面的特色,内容、理念是否新颖。优秀20-25分，良好15-20分，一般0-15分。</div>
+                  </el-form-item>
+                  <el-form-item label="专业性 (20分)">
+                    <el-input-number v-model="scoreForm.profession" :min="0" :max="20" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <div class="score-desc">指参赛项目涉及的内容与参赛团队成员所学和擅长的专业业务、个人特长、爱好是否紧密相结合。参赛团队的组合搭配和分工在知识结构上是否科学合理。优秀15-20分，良好10-15分，一般0-10分。</div>
+                  </el-form-item>
+                  <el-form-item label="实践性 (25分)">
+                    <el-input-number v-model="scoreForm.practice" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <div class="score-desc">指参赛团队是否具备融资、抵御风险、公司管理等能力,是否有能力将规划付诸实践。优秀20-25分，良好15-20分，一般0-15分。</div>
+                  </el-form-item>
+                  <el-form-item label="总分">
+                    <el-input-number v-model="scoreForm.total" :min="0" :max="100" :step="0.1" disabled />
                   </el-form-item>
                   <el-form-item>
-                    <el-button 
-                      type="primary" 
-                      @click="submitScore"
-                      :disabled="!store.competitionStarted"
-                    >
+                    <el-button type="primary" @click="submitScore" :disabled="!store.competitionStarted || !store.allowScoreEdit">
                       提交分数
                     </el-button>
                   </el-form-item>
+                  <el-alert v-if="!store.allowScoreEdit" type="warning" show-icon style="margin-top:8px;">主持人已锁定评分，不能再修改分数，如需请联系主持人</el-alert>
                 </el-form>
               </div>
             </el-card>
@@ -119,7 +126,11 @@ const loginForm = ref({
 })
 
 const scoreForm = ref({
-  score: 80
+  feasibility: 0,
+  innovation: 0,
+  profession: 0,
+  practice: 0,
+  total: 0
 })
 
 // 计算当前选手是否已打分
@@ -240,20 +251,37 @@ watch(() => store.isConnected, (newVal) => {
   }
 })
 
+// 自动计算总分
+watch(
+  () => [scoreForm.value.feasibility, scoreForm.value.innovation, scoreForm.value.profession, scoreForm.value.practice],
+  ([f, i, p, pr]) => {
+    scoreForm.value.total = +(f + i + p + pr).toFixed(1)
+  }
+)
+
 // 提交分数
 const submitScore = () => {
-  if (!scoreForm.value.score && scoreForm.value.score !== 0) {
-    ElMessage.warning('请输入分数')
+  // 校验每项分数
+  if (
+    scoreForm.value.feasibility < 0 || scoreForm.value.feasibility > 30 ||
+    scoreForm.value.innovation < 0 || scoreForm.value.innovation > 25 ||
+    scoreForm.value.profession < 0 || scoreForm.value.profession > 20 ||
+    scoreForm.value.practice < 0 || scoreForm.value.practice > 25
+  ) {
+    ElMessage.warning('请检查各项分数是否在合理区间内')
     return
   }
-
+  if (
+    scoreForm.value.total !== scoreForm.value.feasibility + scoreForm.value.innovation + scoreForm.value.profession + scoreForm.value.practice
+  ) {
+    ElMessage.warning('总分有误')
+    return
+  }
   store.socket.emit('submitScore', {
     contestantId: store.currentContestant,
     judgeId: judgeId.value,
-    score: scoreForm.value.score
+    score: scoreForm.value.total
   })
-
-
 }
 
 // 确保在组件卸载时移除事件监听
@@ -362,5 +390,12 @@ h2 {
 h3 {
   margin: 0 0 15px 0;
   font-size: 1.1rem;
+}
+
+.score-desc {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 </style> 

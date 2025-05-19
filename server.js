@@ -46,7 +46,8 @@ const competitionState = {
   judges: new Map(), // 使用 Map 存储评委编号和 socket.id 的映射
   scores: {},
   contestants: [],
-  showRanking: false // 添加排名显示状态
+  showRanking: false, // 添加排名显示状态
+  allowScoreEdit: true // 新增：是否允许评委修改分数
 };
 
 // 广播比赛状态给所有客户端
@@ -61,7 +62,8 @@ function broadcastState() {
     judges: occupiedJudges,
     scores: competitionState.scores,
     contestants: competitionState.contestants,
-    showRanking: competitionState.showRanking // 添加排名显示状态
+    showRanking: competitionState.showRanking, // 添加排名显示状态
+    allowScoreEdit: competitionState.allowScoreEdit // 新增
   });
 }
 
@@ -78,7 +80,8 @@ io.on('connection', (socket) => {
     judges: occupiedJudges,
     scores: competitionState.scores,
     contestants: competitionState.contestants,
-    showRanking: competitionState.showRanking // 添加排名显示状态
+    showRanking: competitionState.showRanking, // 添加排名显示状态
+    allowScoreEdit: competitionState.allowScoreEdit // 新增
   });
 
   // 处理评委登录
@@ -130,6 +133,7 @@ io.on('connection', (socket) => {
       name: '选手' + (i + 1)
     }));
     competitionState.showRanking = false; // 重置排名显示状态
+    competitionState.allowScoreEdit = true; // 新增：每次开始比赛时允许评分
     broadcastState();
   });
 
@@ -143,25 +147,27 @@ io.on('connection', (socket) => {
     competitionState.contestantsCount = 0;
     competitionState.currentContestant = 1;
     competitionState.showRanking = false; // 重置排名显示状态
+    competitionState.allowScoreEdit = true; // 新增：每次开始比赛时允许评分
     broadcastState();
   });
 
   // 处理选手切换
   socket.on('contestantChange', (data) => {
     competitionState.currentContestant = data.contestantId;
+    competitionState.allowScoreEdit = true; // 切换选手时自动开始评分
     broadcastState();
   });
 
   // 处理评分提交
   socket.on('submitScore', (data) => {
     if (socket.judgeId && competitionState.isStarted) {
-      // 检查该评委是否已经对这个选手打过分
-      if (competitionState.scores[data.contestantId] && 
-          competitionState.scores[data.contestantId][socket.judgeId] !== undefined) {
-        socket.emit('submitFailed', { message: '已经对该选手打过分，不能修改' });
-        return;
+      if (!competitionState.allowScoreEdit) {
+        // 锁定后不能再修改
+        if (competitionState.scores[data.contestantId] && competitionState.scores[data.contestantId][socket.judgeId] !== undefined) {
+          socket.emit('submitFailed', { message: '主持人已锁定评分，不能再修改分数，如需请联系主持人' });
+          return;
+        }
       }
-      
       if (!competitionState.scores[data.contestantId]) {
         competitionState.scores[data.contestantId] = {};
       }
@@ -175,6 +181,18 @@ io.on('connection', (socket) => {
   socket.on('toggleRanking', (data) => {
     console.log('切换排名显示状态:', data.showRanking);
     competitionState.showRanking = data.showRanking;
+    broadcastState();
+  });
+
+  // 新增：主持人停止评分
+  socket.on('stopScoreEdit', () => {
+    competitionState.allowScoreEdit = false;
+    broadcastState();
+  });
+
+  // 新增：主持人开始评分
+  socket.on('startScoreEdit', () => {
+    competitionState.allowScoreEdit = true;
     broadcastState();
   });
 

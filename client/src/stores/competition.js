@@ -23,6 +23,7 @@ export const useCompetitionStore = defineStore('competition', {
     scores: {},
     contestants: [],
     showRanking: false, // 控制是否显示排名
+    allowScoreEdit: true // 新增：是否允许评委修改分数
   }),
   
   getters: {
