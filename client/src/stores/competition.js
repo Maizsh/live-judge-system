@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { io } from 'socket.io-client'
+console.log("开发者：zsh，邮箱：zshx2001@163.com，微信：exemples");
 
 // 获取当前环境的服务器地址
 const getServerUrl = () => {

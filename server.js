@@ -229,7 +229,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3721;
+const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 http.listen(PORT, HOST, () => {

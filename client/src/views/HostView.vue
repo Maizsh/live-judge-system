@@ -1,6 +1,12 @@
 <template>
   <div class="host-view">
-    <el-container>
+    <el-dialog v-model="showPasswordDialog" title="请输入主持人密码" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" width="300px">
+      <el-input v-model="passwordInput" type="password" placeholder="请输入密码" @keyup.enter="checkPassword" />
+      <template #footer>
+        <el-button type="primary" @click="checkPassword">确认</el-button>
+      </template>
+    </el-dialog>
+    <el-container v-if="!showPasswordDialog">
       <el-header>
         <h1>主持人控制界面</h1>
         <div class="connection-status" :class="{ connected: store.isConnected }">
@@ -31,8 +37,9 @@
             <p>当前选手：{{ store.currentContestant }} / {{ store.contestantsCount }}</p>
             <p>已登录评委：{{ store.judges.length }} / {{ store.judgesCount }}</p>
           </div>
-
+          <el-alert title="重要：先导出结果再结束比赛" type="warning" show-icon style="margin-bottom: 10px;"/>
           <div class="control-buttons">
+           
             <el-button-group>
               <el-button 
                 type="primary" 
@@ -149,6 +156,19 @@ import { ref, computed, onMounted } from 'vue'
 import { useCompetitionStore } from '../stores/competition'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const PASSWORD = '1024'
+const showPasswordDialog = ref(true)
+const passwordInput = ref('')
+
+function checkPassword() {
+  if (passwordInput.value === PASSWORD) {
+    showPasswordDialog.value = false
+  } else {
+    ElMessage.error('密码错误！')
+    passwordInput.value = ''
+  }
+}
 
 const store = useCompetitionStore()
 const setupForm = ref({
