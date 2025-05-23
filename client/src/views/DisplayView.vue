@@ -2,7 +2,16 @@
   <div class="display-view">
     <el-container>
       <el-header>
-        <h1>第一届泰安市黄炎培职业教育创新创业大赛</h1>
+        <div class="title-container">
+          <h1 v-if="!isEditing" @click="startEditing">{{ title }}</h1>
+          <div v-else class="title-edit-form">
+            <el-input v-model="editTitle" placeholder="输入比赛标题" ref="titleInput" />
+            <div class="title-actions">
+              <el-button type="primary" size="small" @click="saveTitle">确定</el-button>
+              <el-button size="small" @click="cancelEditing">取消</el-button>
+            </div>
+          </div>
+        </div>
         <div v-if="!store.isConnected" class="connection-status">
           未连接
         </div>
@@ -16,7 +25,7 @@
             <div class="top-info">
               <div class="contestant-info">
                 <div class="contestant-label">当前选手</div>
-                <div class="contestant-number">{{ store.currentContestant }}</div>
+                <div class="contestant-number">{{ getCurrentContestantName }}</div>
               </div>
               <div class="progress-info">
                 <div class="progress-label">评分进度</div>
@@ -38,7 +47,7 @@
                       'active': !isScoreRemoved(score, currentContestantDetails, judgeId)
                     }"
                   >
-                    <div class="judge-number">{{ judgeId }}号评委</div>
+                    <div class="judge-number">{{ getJudgeName(judgeId) }}</div>
                     <div class="score-number">{{ score }}</div>
                   </div>
                 </div>
@@ -78,7 +87,7 @@
                           'removed': isScoreRemoved(score, currentContestantDetails, judgeId)
                         }"
                       >
-                        <span class="judge-id">{{ judgeId }}号</span>
+                        <span class="judge-id">{{ getJudgeName(judgeId) }}</span>
                         <span class="score">{{ score }}</span>
                       </div>
                     </div>
@@ -100,7 +109,7 @@
                 :style="{'--index': index}"
               >
                 <div class="rank-number">{{ index + 1 }}</div>
-                <div class="contestant-number">{{ contestant.number }}号</div>
+                <div class="contestant-number">{{ contestant.name }}</div>
                 <div class="final-score">{{ contestant.score }}</div>
               </div>
             </div>
@@ -116,10 +125,49 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, nextTick } from 'vue'
 import { useCompetitionStore } from '../stores/competition'
 
 const store = useCompetitionStore()
+
+// 标题编辑相关
+const isEditing = ref(false)
+const title = ref('第一届泰安市黄炎培职业教育创新创业大赛')
+const editTitle = ref('')
+const titleInput = ref(null)
+
+// 开始编辑标题
+const startEditing = () => {
+  editTitle.value = title.value
+  isEditing.value = true
+  nextTick(() => {
+    titleInput.value.focus()
+  })
+}
+
+// 保存标题
+const saveTitle = () => {
+  if (editTitle.value.trim()) {
+    title.value = editTitle.value.trim()
+    // 如果需要，可以在此处将标题保存到localStorage或发送到服务器
+    localStorage.setItem('competitionTitle', title.value)
+  }
+  isEditing.value = false
+}
+
+// 取消编辑
+const cancelEditing = () => {
+  isEditing.value = false
+}
+
+// 从localStorage加载保存的标题
+onMounted(() => {
+  const savedTitle = localStorage.getItem('competitionTitle')
+  if (savedTitle) {
+    title.value = savedTitle
+  }
+  store.initializeSocket()
+})
 
 const currentContestantDetails = computed(() => {
   return store.getContestantScoreDetails(store.currentContestant)
@@ -170,9 +218,18 @@ const isScoreRemoved = (score, details, judgeId) => {
   return false
 }
 
-onMounted(() => {
-  store.initializeSocket()
+const getCurrentContestantName = computed(() => {
+  if (!store.currentContestant) return '未知选手'
+  const contestant = store.contestants.find(c => c.id === store.currentContestant)
+  return contestant ? contestant.name : `选手${store.currentContestant}`
 })
+
+const getJudgeName = (judgeId) => {
+  if (store.importedJudgeNames && store.importedJudgeNames[judgeId - 1]) {
+    return store.importedJudgeNames[judgeId - 1]
+  }
+  return `评委${judgeId}`
+}
 </script>
 
 <style scoped>
@@ -196,9 +253,33 @@ onMounted(() => {
   height: 10vh !important;
 }
 
+.title-container {
+  flex: 1;
+}
+
 .el-header h1 {
   font-size: 2.5vw;
   font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  padding: 0.5vh 1vw;
+  border-radius: 0.5vw;
+}
+
+.el-header h1:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.title-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+  max-width: 60vw;
+}
+
+.title-actions {
+  display: flex;
+  gap: 1vw;
 }
 
 .connection-status {
@@ -234,6 +315,11 @@ onMounted(() => {
 
 .contestant-info, .progress-info {
   text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .contestant-label, .progress-label {
@@ -243,14 +329,18 @@ onMounted(() => {
 }
 
 .contestant-number {
-  font-size: 5vw;
+  font-size: 4vw;
   font-weight: bold;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  text-align: center;
+  word-break: keep-all;
+  line-height: 1.2;
 }
 
 .progress-value {
-  font-size: 3vw;
+  font-size: 4vw;
   font-weight: bold;
+  line-height: 1.2;
 }
 
 /* 评分区域样式 */
@@ -292,6 +382,10 @@ onMounted(() => {
 .judge-number {
   font-size: 1.2vw;
   margin-bottom: 1vh;
+  text-align: center;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .score-number {
@@ -416,6 +510,10 @@ onMounted(() => {
 .judge-id {
   font-size: 0.8vw;
   opacity: 0.9;
+  text-align: center;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .score {
@@ -508,6 +606,7 @@ onMounted(() => {
 
 .ranking-item .contestant-number {
   font-size: 2vw;
+  text-align: center;
 }
 
 .ranking-item .final-score {
@@ -524,6 +623,51 @@ onMounted(() => {
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+/* 响应式样式 */
+@media screen and (max-width: 768px) {
+  .el-header h1 {
+    font-size: 4vw;
+  }
+  
+  .title-edit-form {
+    max-width: 80vw;
+  }
+  
+  .connection-status {
+    font-size: 2.5vw;
+  }
+}
+
+/* 移动端竖屏适配 */
+@media screen and (max-width: 480px) {
+  .el-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1vh 2vw;
+    height: auto !important;
+  }
+  
+  .el-header h1 {
+    font-size: 5vw;
+    margin-bottom: 1vh;
+  }
+  
+  .title-container {
+    width: 100%;
+    margin-bottom: 1vh;
+  }
+  
+  .title-edit-form {
+    max-width: 95vw;
+  }
+  
+  .connection-status {
+    align-self: flex-start;
+    font-size: 3vw;
+    padding: 0.5vh 2vw;
   }
 }
 </style> 

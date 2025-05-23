@@ -47,7 +47,8 @@ const competitionState = {
   scores: {},
   contestants: [],
   showRanking: false, // 添加排名显示状态
-  allowScoreEdit: true // 新增：是否允许评委修改分数
+  allowScoreEdit: true, // 新增：是否允许评委修改分数
+  importedJudgeNames: []
 };
 
 // 广播比赛状态给所有客户端
@@ -63,7 +64,8 @@ function broadcastState() {
     scores: competitionState.scores,
     contestants: competitionState.contestants,
     showRanking: competitionState.showRanking, // 添加排名显示状态
-    allowScoreEdit: competitionState.allowScoreEdit // 新增
+    allowScoreEdit: competitionState.allowScoreEdit, // 新增
+    importedJudgeNames: competitionState.importedJudgeNames
   });
 }
 
@@ -81,7 +83,8 @@ io.on('connection', (socket) => {
     scores: competitionState.scores,
     contestants: competitionState.contestants,
     showRanking: competitionState.showRanking, // 添加排名显示状态
-    allowScoreEdit: competitionState.allowScoreEdit // 新增
+    allowScoreEdit: competitionState.allowScoreEdit, // 新增
+    importedJudgeNames: competitionState.importedJudgeNames
   });
 
   // 处理评委登录
@@ -103,12 +106,22 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // 获取评委名称（如果有导入的名单）
+    let judgeName = `评委${judgeNumber}`;
+    if (competitionState.importedJudgeNames && 
+        competitionState.importedJudgeNames[judgeNumber - 1]) {
+      judgeName = competitionState.importedJudgeNames[judgeNumber - 1];
+    }
+
     // 记录评委信息
     competitionState.judges.set(judgeNumber, socket.id);
     socket.judgeId = judgeNumber;
     
-    console.log(`评委 ${judgeNumber} 登录成功`);
-    socket.emit('loginSuccess', { judgeId: judgeNumber });
+    console.log(`评委 ${judgeNumber} 登录成功，名称：${judgeName}`);
+    socket.emit('loginSuccess', { 
+      judgeId: judgeNumber,
+      judgeName: judgeName 
+    });
     broadcastState();
   });
 
@@ -128,10 +141,22 @@ io.on('connection', (socket) => {
     competitionState.judgesCount = data.judgesCount;
     competitionState.contestantsCount = data.contestantsCount;
     competitionState.currentContestant = 1;
-    competitionState.contestants = Array.from({ length: data.contestantsCount }, (_, i) => ({
-      id: i + 1,
-      name: '选手' + (i + 1)
-    }));
+    
+    // 使用客户端传来的选手列表（如果有导入的名单）
+    if (data.contestants && Array.isArray(data.contestants)) {
+      competitionState.contestants = data.contestants;
+    } else {
+      competitionState.contestants = Array.from({ length: data.contestantsCount }, (_, i) => ({
+        id: i + 1,
+        name: '选手' + (i + 1)
+      }));
+    }
+    
+    // 保存导入的评委名单（如果有）
+    if (data.importedJudgeNames && Array.isArray(data.importedJudgeNames)) {
+      competitionState.importedJudgeNames = data.importedJudgeNames;
+    }
+    
     competitionState.showRanking = false; // 重置排名显示状态
     competitionState.allowScoreEdit = true; // 新增：每次开始比赛时允许评分
     broadcastState();
@@ -148,6 +173,7 @@ io.on('connection', (socket) => {
     competitionState.currentContestant = 1;
     competitionState.showRanking = false; // 重置排名显示状态
     competitionState.allowScoreEdit = true; // 新增：每次开始比赛时允许评分
+    competitionState.importedJudgeNames = []; // 重置导入的评委名单
     broadcastState();
   });
 

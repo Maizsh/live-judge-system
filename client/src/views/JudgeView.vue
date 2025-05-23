@@ -18,7 +18,7 @@
                 <el-option
                   v-for="n in store.judgesCount"
                   :key="n"
-                  :label="`评委 ${n} 号`"
+                  :label="getJudgeName(n)"
                   :value="n"
                 />
               </el-select>
@@ -34,7 +34,7 @@
         <!-- 打分界面 -->
         <div v-else class="scoring-section">
           <div class="judge-info">
-            <el-tag size="large">评委 {{ judgeId }} 号</el-tag>
+            <el-tag size="large">{{ judgeName }}</el-tag>
             <el-button type="danger" @click="handleLogout" size="small">
               退出登录
             </el-button>
@@ -45,7 +45,7 @@
             <el-card class="contestant-card">
               <template #header>
                 <div class="card-header">
-                  <span>选手 {{ store.currentContestant }} 号</span>
+                  <span class="contestant-name">选手: <strong>{{ getCurrentContestantName }}</strong></span>
                   <el-tag 
                     :type="hasScored ? 'success' : 'warning'"
                     size="small"
@@ -56,28 +56,28 @@
               </template>
               
               <div class="score-input">
-                <el-form :model="scoreForm" label-width="100px">
-                  <el-form-item label="可行性 (分)">
-                    <el-input-number v-model="scoreForm.feasibility" :min="0" :max="30" :step="0.5" :disabled="!store.allowScoreEdit" />
+                <el-form :model="scoreForm" label-position="top">
+                  <el-form-item label="可行性 (30分)">
+                    <el-input-number v-model="scoreForm.feasibility" :min="0" :max="30" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
                     <div class="score-desc">指对参赛项目的主要内容和配套条件,如市场需求、资源供应、资金筹措、盈利能力等,从技术、经济等方面进行调查研究和分析比较,并提出该项目是否值得投资、如何进行建设的咨询意见。优秀25-30分，良好15-25分，一般0-15分。</div>
                   </el-form-item>
                   <el-form-item label="创新性 (25分)">
-                    <el-input-number v-model="scoreForm.innovation" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <el-input-number v-model="scoreForm.innovation" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
                     <div class="score-desc">指提交的参赛项目是否具有一定的技术含量,或具有低碳、环保、节能等方面的特色,内容、理念是否新颖。优秀20-25分，良好15-20分，一般0-15分。</div>
                   </el-form-item>
                   <el-form-item label="专业性 (20分)">
-                    <el-input-number v-model="scoreForm.profession" :min="0" :max="20" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <el-input-number v-model="scoreForm.profession" :min="0" :max="20" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
                     <div class="score-desc">指参赛项目涉及的内容与参赛团队成员所学和擅长的专业业务、个人特长、爱好是否紧密相结合。参赛团队的组合搭配和分工在知识结构上是否科学合理。优秀15-20分，良好10-15分，一般0-10分。</div>
                   </el-form-item>
                   <el-form-item label="实践性 (25分)">
-                    <el-input-number v-model="scoreForm.practice" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" />
+                    <el-input-number v-model="scoreForm.practice" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
                     <div class="score-desc">指参赛团队是否具备融资、抵御风险、公司管理等能力,是否有能力将规划付诸实践。优秀20-25分，良好15-20分，一般0-15分。</div>
                   </el-form-item>
                   <el-form-item label="总分">
-                    <el-input-number v-model="scoreForm.total" :min="0" :max="100" :step="0.1" disabled />
+                    <el-input-number v-model="scoreForm.total" :min="0" :max="100" :step="0.1" disabled class="score-input-number total-score" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button type="primary" @click="submitScore" :disabled="!store.competitionStarted || !store.allowScoreEdit">
+                    <el-button type="primary" @click="submitScore" :disabled="!store.competitionStarted || !store.allowScoreEdit" size="large" class="submit-button">
                       提交分数
                     </el-button>
                   </el-form-item>
@@ -95,8 +95,9 @@
           <div class="score-history" v-if="store.competitionStarted">
             <h3>历史打分记录</h3>
             <el-table :data="scoreHistory" style="width: 100%">
-              <el-table-column prop="contestantId" label="选手编号" width="100" />
-              <el-table-column prop="score" label="分数" width="100" />
+              <el-table-column prop="contestantId" label="选手编号" width="80" />
+              <el-table-column prop="contestantName" label="选手姓名" width="120" />
+              <el-table-column prop="score" label="分数" width="80" />
               <el-table-column prop="status" label="状态">
                 <template #default="{ row }">
                   <el-tag :type="row.score ? 'success' : 'info'">
@@ -119,6 +120,7 @@ import { ElMessage } from 'element-plus'
 
 const store = useCompetitionStore()
 const judgeId = ref(null)
+const judgeName = ref(null)
 
 const loginForm = ref({
   judgeNumber: null,
@@ -147,6 +149,7 @@ const scoreHistory = computed(() => {
     const contestantScores = store.scores[contestant.id] || {}
     return {
       contestantId: contestant.id,
+      contestantName: contestant.name,
       score: contestantScores[judgeId.value],
       status: contestantScores[judgeId.value] ? '已打分' : '未打分'
     }
@@ -210,6 +213,7 @@ const handleLogin = async () => {
         clearTimeout(timeout)
         if (data.judgeId === loginForm.value.judgeNumber) {
           judgeId.value = data.judgeId
+          judgeName.value = data.judgeName || `评委${data.judgeId}号`
           resolve()
         }
       }
@@ -231,6 +235,7 @@ const handleLogin = async () => {
     console.error('登录失败:', error)
     ElMessage.error(error.message || '登录失败')
     judgeId.value = null
+    judgeName.value = null
   } finally {
     loginForm.value.loading = false
   }
@@ -240,6 +245,7 @@ const handleLogin = async () => {
 const handleLogout = () => {
   store.judgeLogout(judgeId.value)
   judgeId.value = null
+  judgeName.value = null
   ElMessage.success('已退出登录')
 }
 
@@ -294,12 +300,29 @@ onUnmounted(() => {
     }
   }
 })
+
+// 获取当前选手的姓名
+const getCurrentContestantName = computed(() => {
+  if (!store.currentContestant) return '未命名选手'
+  const contestant = store.contestants.find(c => c.id === store.currentContestant)
+  return contestant ? contestant.name : '未命名选手'
+})
+
+// 获取评委名称
+const getJudgeName = (judgeNumber) => {
+  if (store.importedJudgeNames && store.importedJudgeNames[judgeNumber - 1]) {
+    return store.importedJudgeNames[judgeNumber - 1]
+  }
+  return `评委 ${judgeNumber} 号`
+}
 </script>
 
 <style scoped>
 .judge-view {
-  height: 100vh;
+  min-height: 100vh;
   background-color: #f5f7fa;
+  display: flex;
+  flex-direction: column;
 }
 
 .el-header {
@@ -309,6 +332,22 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.el-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.el-main {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* 提高移动端滚动体验 */
 }
 
 .connection-status {
@@ -320,10 +359,6 @@ onUnmounted(() => {
 
 .connection-status.connected {
   background-color: #67c23a;
-}
-
-.el-main {
-  padding: 20px;
 }
 
 .login-section {
@@ -338,6 +373,7 @@ onUnmounted(() => {
 .scoring-section {
   max-width: 800px;
   margin: 0 auto;
+  padding-bottom: 50px; /* 增加底部空间 */
 }
 
 .judge-info {
@@ -359,9 +395,71 @@ onUnmounted(() => {
   align-items: center;
 }
 
+.contestant-name {
+  font-size: 1.2rem;
+  color: #409EFF;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: #ecf5ff;
+  border-left: 3px solid #409EFF;
+}
+
 .score-input {
-  max-width: 300px;
+  width: 100%;
+  max-width: 500px;
   margin: 0 auto;
+}
+
+/* 增大输入框样式 */
+.score-input-number {
+  width: 100% !important;
+  margin-bottom: 10px;
+}
+
+.score-input-number :deep(.el-input-number__decrease),
+.score-input-number :deep(.el-input-number__increase) {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 20px;
+  transform: none !important;
+  position: absolute;
+}
+
+.score-input-number :deep(.el-input-number__decrease) {
+  left: 1px;
+  border-right: 1px solid #dcdfe6;
+  border-radius: 4px 0 0 4px;
+}
+
+.score-input-number :deep(.el-input-number__increase) {
+  right: 1px;
+  border-left: 1px solid #dcdfe6;
+  border-radius: 0 4px 4px 0;
+}
+
+.score-input-number :deep(.el-input__inner) {
+  height: 46px !important;
+  font-size: 20px;
+  padding-left: 50px;
+  padding-right: 50px;
+  text-align: center;
+}
+
+.total-score {
+  font-weight: bold;
+}
+
+.total-score :deep(.el-input__inner) {
+  color: #409EFF;
+  font-size: 24px;
+}
+
+.submit-button {
+  width: 100%;
+  height: 50px;
+  font-size: 18px;
+  margin-top: 10px;
 }
 
 .score-history {
@@ -396,6 +494,51 @@ h3 {
   font-size: 12px;
   color: #888;
   margin-top: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 15px;
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+  .el-main {
+    padding: 10px;
+  }
+  
+  .scoring-section {
+    width: 100%;
+    padding-bottom: 80px; /* 移动端增加更多底部空间 */
+  }
+  
+  .score-input {
+    width: 100%;
+  }
+
+  .contestant-name {
+    font-size: 1.1rem;
+  }
+  
+  .score-desc {
+    font-size: 11px;
+  }
+  
+  .score-input-number :deep(.el-input-number__decrease),
+  .score-input-number :deep(.el-input-number__increase) {
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+  }
+  
+  .score-input-number :deep(.el-input__inner) {
+    height: 50px !important;
+    font-size: 22px;
+    padding-left: 60px;
+    padding-right: 60px;
+  }
+  
+  /* 确保表格在移动端可以横向滚动 */
+  .score-history .el-table {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style> 

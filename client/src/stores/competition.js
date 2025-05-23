@@ -23,7 +23,8 @@ export const useCompetitionStore = defineStore('competition', {
     scores: {},
     contestants: [],
     showRanking: false, // 控制是否显示排名
-    allowScoreEdit: true // 新增：是否允许评委修改分数
+    allowScoreEdit: true, // 新增：是否允许评委修改分数
+    importedJudgeNames: []
   }),
   
   getters: {
@@ -172,6 +173,8 @@ export const useCompetitionStore = defineStore('competition', {
         this.contestants = state.contestants || []
         this.judges = Array.isArray(state.judges) ? state.judges : []
         this.showRanking = state.showRanking || false
+        this.allowScoreEdit = state.allowScoreEdit
+        this.importedJudgeNames = state.importedJudgeNames || []
         console.log('更新评委列表:', this.judges)
       })
 
@@ -196,23 +199,41 @@ export const useCompetitionStore = defineStore('competition', {
       }
     },
     
-    setupCompetition(judgesCount, contestantsCount) {
+    setupCompetition(judgesCount, contestantsCount, importedNames = { contestants: [], judges: [] }) {
       console.log('设置比赛:', judgesCount, '名评委,', contestantsCount, '名选手')
+      console.log('导入的名单:', importedNames)
+      
       this.judgesCount = judgesCount
       this.contestantsCount = contestantsCount
-      this.contestants = Array.from({ length: contestantsCount }, (_, i) => ({
-        id: i + 1,
-        name: '选手' + (i + 1)
-      }))
+      
+      // 创建选手列表，如果有导入名单则使用导入的名字
+      this.contestants = Array.from({ length: contestantsCount }, (_, i) => {
+        const importedName = importedNames.contestants[i]
+        return {
+          id: i + 1,
+          name: importedName || '选手' + (i + 1) // 如果导入名单中没有名字，使用默认名字
+        }
+      })
+      
       this.scores = {}
       this.judges = [] // 重置评委列表
+      
+      // 先清空旧的评委名单
+      this.importedJudgeNames = []
+      
+      // 只有导入了新名单才保存
+      if (importedNames.judges && importedNames.judges.length > 0) {
+        this.importedJudgeNames = importedNames.judges
+      }
     },
     
     startCompetition() {
       console.log('开始比赛')
       this.socket?.emit('startCompetition', {
         judgesCount: this.judgesCount,
-        contestantsCount: this.contestantsCount
+        contestantsCount: this.contestantsCount,
+        contestants: this.contestants,
+        importedJudgeNames: this.importedJudgeNames
       })
     },
     
@@ -220,6 +241,7 @@ export const useCompetitionStore = defineStore('competition', {
       console.log('结束比赛')
       this.socket?.emit('endCompetition')
       this.judges = [] // 结束比赛时清空评委列表
+      this.importedJudgeNames = [] // 清空导入的评委名单
     },
     
     nextContestant() {

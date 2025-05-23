@@ -23,6 +23,18 @@
             <el-form-item label="选手数量">
               <el-input-number v-model="setupForm.contestantsCount" :min="1" :max="50" />
             </el-form-item>
+            <el-form-item label="导入名单">
+              <el-upload
+                accept=".xlsx,.xls"
+                :auto-upload="false"
+                :on-change="handleFileChange"
+                :limit="1"
+                :file-list="fileList"
+              >
+                <el-button type="primary">选择Excel文件</el-button>
+              </el-upload>
+              <p class="upload-tip">Excel第一列为选手姓名，第二列为评委姓名</p>
+            </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="setupCompetition">
                 确认设置
@@ -172,6 +184,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useCompetitionStore } from '../stores/competition'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import * as XLSX from 'xlsx'
 
 const PASSWORD = '1024'
 const showPasswordDialog = ref(true)
@@ -190,6 +203,12 @@ const store = useCompetitionStore()
 const setupForm = ref({
   judgesCount: 3,
   contestantsCount: 5
+})
+
+const fileList = ref([])
+const importedNames = ref({
+  contestants: [],
+  judges: []
 })
 
 const getPreviewScores = (scores) => {
@@ -222,10 +241,55 @@ onMounted(() => {
   store.socket?.on('syncState', (state) => {
     store.allowScoreEdit = state.allowScoreEdit
   })
+  
+  // 组件挂载时清空导入的名单数据
+  importedNames.value = {
+    contestants: [],
+    judges: []
+  }
+  fileList.value = []
 })
 
+const handleFileChange = (uploadFile) => {
+  if (!uploadFile.raw) {
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result)
+      const workbook = XLSX.read(data, { type: 'array' })
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+      
+      // 解析数据
+      const contestants = jsonData.map(row => row[0]).filter(Boolean)
+      const judges = jsonData.map(row => row[1]).filter(Boolean)
+      
+      // 更新导入的名单
+      importedNames.value = {
+        contestants,
+        judges
+      }
+      
+      ElMessage.success('名单导入成功')
+    } catch (error) {
+      console.error('解析Excel失败:', error)
+      ElMessage.error('解析Excel失败，请检查文件格式')
+    }
+  }
+  
+  reader.readAsArrayBuffer(uploadFile.raw)
+}
+
 const setupCompetition = () => {
-  store.setupCompetition(setupForm.value.judgesCount, setupForm.value.contestantsCount)
+  // 使用导入的名单设置比赛
+  store.setupCompetition(
+    setupForm.value.judgesCount, 
+    setupForm.value.contestantsCount,
+    importedNames.value
+  )
   store.startCompetition()
 }
 
@@ -237,6 +301,13 @@ const endCompetition = async () => {
       type: 'warning'
     })
     store.endCompetition()
+    
+    // 清空导入的名单数据
+    importedNames.value = {
+      contestants: [],
+      judges: []
+    }
+    fileList.value = []
   } catch {
     // 用户取消操作
   }
@@ -399,5 +470,12 @@ h3 {
 
 .el-tag {
   margin: 2px;
+}
+
+.upload-tip {
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-size: 0.8rem;
+  color: #909399;
 }
 </style> 
