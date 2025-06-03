@@ -44,7 +44,7 @@ const competitionState = {
   contestantsCount: 0,
   currentContestant: 1,
   judges: new Map(), // 使用 Map 存储评委编号和 socket.id 的映射
-  scores: {},
+  scores: {}, // 存储格式：{ contestantId: { judgeId: { score: number, approved: boolean } } }
   contestants: [],
   showRanking: false, // 添加排名显示状态
   allowScoreEdit: true, // 新增：是否允许评委修改分数
@@ -189,7 +189,8 @@ io.on('connection', (socket) => {
     if (socket.judgeId && competitionState.isStarted) {
       if (!competitionState.allowScoreEdit) {
         // 锁定后不能再修改
-        if (competitionState.scores[data.contestantId] && competitionState.scores[data.contestantId][socket.judgeId] !== undefined) {
+        if (competitionState.scores[data.contestantId] && 
+            competitionState.scores[data.contestantId][socket.judgeId]?.approved) {
           socket.emit('submitFailed', { message: '主持人已锁定评分，不能再修改分数，如需请联系主持人' });
           return;
         }
@@ -197,8 +198,41 @@ io.on('connection', (socket) => {
       if (!competitionState.scores[data.contestantId]) {
         competitionState.scores[data.contestantId] = {};
       }
-      competitionState.scores[data.contestantId][socket.judgeId] = data.score;
-      socket.emit('submitSuccess', { message: '打分成功' });
+      competitionState.scores[data.contestantId][socket.judgeId] = {
+        score: data.score,
+        approved: false // 新增：默认未审核
+      };
+      socket.emit('submitSuccess', { message: '打分成功，等待主持人审核' });
+      broadcastState();
+    }
+  });
+
+  // 处理修改评分
+  socket.on('updateScore', (data) => {
+    if (competitionState.scores[data.contestantId] && 
+        competitionState.scores[data.contestantId][data.judgeId]) {
+      competitionState.scores[data.contestantId][data.judgeId] = {
+        score: data.score,
+        approved: false // 修改后需要重新审核
+      };
+      broadcastState();
+    }
+  });
+
+  // 处理删除评分
+  socket.on('deleteScore', (data) => {
+    if (competitionState.scores[data.contestantId] && 
+        competitionState.scores[data.contestantId][data.judgeId]) {
+      delete competitionState.scores[data.contestantId][data.judgeId];
+      broadcastState();
+    }
+  });
+
+  // 处理通过评分
+  socket.on('approveScore', (data) => {
+    if (competitionState.scores[data.contestantId] && 
+        competitionState.scores[data.contestantId][data.judgeId]) {
+      competitionState.scores[data.contestantId][data.judgeId].approved = true;
       broadcastState();
     }
   });
@@ -273,7 +307,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 
 http.listen(PORT, HOST, () => {

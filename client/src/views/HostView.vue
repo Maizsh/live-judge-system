@@ -8,7 +8,7 @@
     </el-dialog>
     <el-container v-if="!showPasswordDialog">
       <el-header>
-        <h1>主持人控制界面</h1>
+        <h1 style="color: black;">主持人控制界面</h1>
         <div class="connection-status" :class="{ connected: store.isConnected }">
           {{ store.isConnected ? '已连接' : '未连接' }}
         </div>
@@ -43,7 +43,7 @@
           </el-form>
         </div>
 
-        <div class="competition-section" v-else>
+        <div style="color: black;" class="competition-section" v-else>
           <div class="current-status">
             <h2>当前比赛状态</h2>
             <p>当前选手：{{ store.currentContestant }} / {{ store.contestantsCount }}</p>
@@ -142,10 +142,10 @@
                         <el-tag 
                           v-for="(score, judgeId) in getPreviewScores(row.scoreDetails.allScores)"
                           :key="judgeId"
-                          :type="score ? 'success' : 'info'"
+                          :type="getScoreTagType(score)"
                           class="score-tag"
                         >
-                          评委{{ judgeId }}: {{ score || '未打分' }}
+                          评委{{ judgeId+1 }}: {{ score ? score.score : '未打分' }}
                         </el-tag>
                         <el-tag v-if="row.scoreDetails.allScores.length > 5" type="info">
                           ...更多
@@ -153,20 +153,24 @@
                       </div>
                     </template>
                     <div class="scores-detail">
-                      <el-row :gutter="10">
-                        <el-col 
-                          v-for="(score, judgeId) in row.scoreDetails.allScores" 
-                          :key="judgeId"
-                          :span="8"
-                        >
-                          <el-tag 
-                            :type="score ? 'success' : 'info'"
-                            class="score-tag full-width"
-                          >
-                            评委{{ judgeId }}: {{ score || '未打分' }}
-                          </el-tag>
-                        </el-col>
-                      </el-row>
+                      <div class="scores-grid">
+                        <div v-for="(score, judgeId) in row.scoreDetails.allScores" :key="judgeId" class="score-card">
+                          <div class="score-card-header">
+                            <span class="judge-name">{{ getJudgeName(judgeId) }}</span>
+                            <el-tag :type="getScoreTagType(score)" size="small">
+                              {{ score ? (score.approved ? '已通过' : '待审核') : '未打分' }}
+                            </el-tag>
+                          </div>
+                          <div class="score-value">
+                            {{ score ? score.score : '未打分' }}
+                          </div>
+                          <div class="score-actions-group" v-if="score">
+                            <el-button type="primary" size="small" @click="editScore(row.contestantId, judgeId, score.score)" v-if="!score.approved">修改</el-button>
+                            <el-button type="danger" size="small" @click="deleteScore(row.contestantId, judgeId)" v-if="!score.approved">删除</el-button>
+                            <el-button type="success" size="small" @click="approveScore(row.contestantId, judgeId)" v-if="!score.approved">通过</el-button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </el-popover>
                 </template>
@@ -176,6 +180,27 @@
         </div>
       </el-main>
     </el-container>
+
+    <el-dialog
+      v-model="editScoreDialog"
+      title="修改评分"
+      width="300px"
+    >
+      <el-form>
+        <el-form-item label="新分数">
+          <el-input-number
+            v-model="currentEditScore.score"
+            :min="0"
+            :max="100"
+            :precision="2"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editScoreDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveEditedScore">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -211,28 +236,24 @@ const importedNames = ref({
   judges: []
 })
 
+const editScoreDialog = ref(false)
+const currentEditScore = ref({
+  contestantId: null,
+  judgeId: null,
+  score: null
+})
+
 const getPreviewScores = (scores) => {
-  const entries = Object.entries(scores)
-  return Object.fromEntries(entries.slice(0, 5))
+  return Object.entries(scores).slice(0, 5)
 }
 
 const scoreTableData = computed(() => {
-  return store.contestants.map(contestant => {
-    const details = store.getContestantScoreDetails(contestant.id)
-    const finalScore = store.calculateFinalScore(contestant.id)
-    console.log(`选手 ${contestant.id} 得分详情:`, {
-      details,
-      finalScore,
-      rawScores: store.scores[contestant.id] || {}
-    })
-    
-    return {
-      contestantId: contestant.id,
-      name: contestant.name,
-      scoreDetails: details,
-      finalScore
-    }
-  })
+  return store.contestants.map(contestant => ({
+    contestantId: contestant.id,
+    name: contestant.name,
+    finalScore: store.calculateFinalScore(contestant.id),
+    scoreDetails: store.getContestantScoreDetails(contestant.id)
+  }))
 })
 
 onMounted(() => {
@@ -250,11 +271,7 @@ onMounted(() => {
   fileList.value = []
 })
 
-const handleFileChange = (uploadFile) => {
-  if (!uploadFile.raw) {
-    return
-  }
-
+const handleFileChange = (file) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
@@ -263,108 +280,149 @@ const handleFileChange = (uploadFile) => {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
       const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
       
-      // 解析数据
-      const contestants = jsonData.map(row => row[0]).filter(Boolean)
-      const judges = jsonData.map(row => row[1]).filter(Boolean)
-      
-      // 更新导入的名单
+      // 提取选手和评委名单
       importedNames.value = {
-        contestants,
-        judges
+        contestants: jsonData.map(row => row[0]).filter(Boolean),
+        judges: jsonData.map(row => row[1]).filter(Boolean)
       }
+      
+      // 更新表单
+      setupForm.value.contestantsCount = importedNames.value.contestants.length
+      setupForm.value.judgesCount = importedNames.value.judges.length
       
       ElMessage.success('名单导入成功')
     } catch (error) {
-      console.error('解析Excel失败:', error)
-      ElMessage.error('解析Excel失败，请检查文件格式')
+      console.error('解析Excel文件失败:', error)
+      ElMessage.error('解析Excel文件失败')
     }
   }
-  
-  reader.readAsArrayBuffer(uploadFile.raw)
+  reader.readAsArrayBuffer(file.raw)
 }
 
 const setupCompetition = () => {
-  // 使用导入的名单设置比赛
+  if (setupForm.value.judgesCount < 1 || setupForm.value.contestantsCount < 1) {
+    ElMessage.error('评委数量和选手数量必须大于0')
+    return
+  }
+  
   store.setupCompetition(
-    setupForm.value.judgesCount, 
+    setupForm.value.judgesCount,
     setupForm.value.contestantsCount,
-    importedNames.value
+    {
+      contestants: importedNames.value.contestants,
+      judges: importedNames.value.judges
+    }
   )
   store.startCompetition()
 }
 
-const endCompetition = async () => {
-  try {
-    await ElMessageBox.confirm('确定要结束比赛吗？', '提示', {
+const endCompetition = () => {
+  ElMessageBox.confirm(
+    '确定要结束比赛吗？请确保已导出结果。',
+    '警告',
+    {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    })
-    store.endCompetition()
-    
-    // 清空导入的名单数据
-    importedNames.value = {
-      contestants: [],
-      judges: []
     }
-    fileList.value = []
-  } catch {
-    // 用户取消操作
-  }
+  ).then(() => {
+    store.endCompetition()
+  }).catch(() => {})
 }
 
 const exportResults = () => {
   const results = store.exportResults()
+  const wb = XLSX.utils.book_new()
   
-  // 准备 Excel 数据
-  const workbookData = [
-    // 表头
-    ['选手编号', '选手姓名', '最终得分', '有效分数数量', '最高分', '最低分', '所有评委打分']
-  ]
-
-  // 添加选手数据
-  results.summary.forEach(item => {
-    const allScores = Object.entries(item.scoreDetails.allScores)
-      .map(([judgeId, score]) => `评委${judgeId}: ${score}`)
-      .join(', ')
-
-    workbookData.push([
-      item.contestantId,
-      item.name,
-      item.finalScore,
-      item.scoreDetails.validScoresCount,
-      item.scoreDetails.highestScore || '-',
-      item.scoreDetails.lowestScore || '-',
-      allScores
-    ])
+  // 创建总表
+  const summaryData = results.summary.map(item => ({
+    '选手编号': item.contestantId,
+    '选手姓名': item.name,
+    '最终得分': item.finalScore,
+    '有效评分数量': item.scoreDetails.validScoresCount,
+    '最高分': item.scoreDetails.highestScore || '',
+    '最低分': item.scoreDetails.lowestScore || '',
+    '使用分数': item.scoreDetails.usedScores.join(', ')
+  }))
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData)
+  XLSX.utils.book_append_sheet(wb, summaryWs, '总表')
+  
+  // 创建详细评分表
+  const detailData = []
+  results.contestants.forEach(contestant => {
+    const contestantScores = results.scores[contestant.id] || {}
+    Object.entries(contestantScores).forEach(([judgeId, score]) => {
+      detailData.push({
+        '选手编号': contestant.id,
+        '选手姓名': contestant.name,
+        '评委编号': judgeId,
+        '评分': score.score,
+        '状态': score.approved ? '已通过' : '待审核'
+      })
+    })
   })
-
-  // 按最终得分排序
-  workbookData.slice(1).sort((a, b) => Number(b[2]) - Number(a[2]))
-
-  // 发送到服务器生成 Excel
-  store.socket?.emit('exportExcel', { data: workbookData }, (response) => {
-    if (response.success) {
-      // 创建下载链接
-      const link = document.createElement('a')
-      link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${response.file}`
-      link.download = '比赛成绩表.xlsx'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      ElMessage.success('成绩表已导出')
-    } else {
-      ElMessage.error('导出失败：' + response.error)
-    }
-  })
+  const detailWs = XLSX.utils.json_to_sheet(detailData)
+  XLSX.utils.book_append_sheet(wb, detailWs, '详细评分')
+  
+  // 导出文件
+  XLSX.writeFile(wb, '比赛结果.xlsx')
 }
 
 const stopScoreEdit = () => {
-  store.socket?.emit('stopScoreEdit')
+  store.stopScoreEdit()
 }
 
 const startScoreEdit = () => {
-  store.socket?.emit('startScoreEdit')
+  store.startScoreEdit()
+}
+
+const getScoreTagType = (score) => {
+  if (!score) return 'info'
+  if (score.approved) return 'success'
+  return 'warning'
+}
+
+const editScore = (contestantId, judgeId, score) => {
+  currentEditScore.value = {
+    contestantId,
+    judgeId,
+    score
+  }
+  editScoreDialog.value = true
+}
+
+const deleteScore = (contestantId, judgeId) => {
+  ElMessageBox.confirm(
+    '确定要删除这个评分吗？',
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    store.deleteScore(contestantId, judgeId)
+  }).catch(() => {})
+}
+
+const approveScore = (contestantId, judgeId) => {
+  store.approveScore(contestantId, judgeId)
+}
+
+const saveEditedScore = () => {
+  if (currentEditScore.value) {
+    store.updateScore(
+      currentEditScore.value.contestantId,
+      currentEditScore.value.judgeId,
+      currentEditScore.value.score
+    )
+    editScoreDialog.value = false
+  }
+}
+
+const getJudgeName = (judgeId) => {
+  const judge = store.judges.find(j => j.id === judgeId)
+  return judge ? judge.name : `评委${judgeId}`
 }
 </script>
 
@@ -429,11 +487,84 @@ const startScoreEdit = () => {
 
 .scores-table {
   margin-top: 20px;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+}
+
+.scores-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
 }
 
 .score-tag {
-  margin-right: 8px;
-  margin-bottom: 4px;
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.scores-detail {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.scores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.score-card {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 4px 0 rgba(0,0,0,0.04);
+}
+
+.score-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.score-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #409EFF;
+  margin-bottom: 6px;
+}
+
+.score-actions-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.el-table {
+  margin-top: 16px;
+}
+
+.el-table :deep(th) {
+  background-color: #f5f7fa;
+  font-weight: bold;
+}
+
+.el-table :deep(td) {
+  padding: 12px 0;
+}
+
+.el-popover {
+  max-width: 600px !important;
 }
 
 h1 {
@@ -451,25 +582,10 @@ h3 {
   font-size: 1.1rem;
 }
 
-.scores-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.scores-detail {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
 .full-width {
   width: 100%;
   margin-bottom: 8px;
   text-align: center;
-}
-
-.el-tag {
-  margin: 2px;
 }
 
 .upload-tip {
@@ -477,5 +593,11 @@ h3 {
   margin-bottom: 0;
   font-size: 0.8rem;
   color: #909399;
+}
+
+@media screen and (max-width: 768px) {
+  .scores-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style> 

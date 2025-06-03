@@ -39,7 +39,7 @@
               <template v-if="currentContestantDetails.validScoresCount < store.judgesCount">
                 <div class="scores-display">
                   <div 
-                    v-for="(score, judgeId) in currentContestantDetails.allScores" 
+                    v-for="(score, judgeId) in approvedScores" 
                     :key="judgeId"
                     class="score-card"
                     :class="{
@@ -48,7 +48,7 @@
                     }"
                   >
                     <div class="judge-number">{{ getJudgeName(judgeId) }}</div>
-                    <div class="score-number">{{ score }}</div>
+                    <div class="score-number">{{ score.score }}</div>
                   </div>
                 </div>
               </template>
@@ -80,7 +80,7 @@
                     <div class="scores-label">评委打分</div>
                     <div class="scores-grid">
                       <div 
-                        v-for="(score, judgeId) in currentContestantDetails.allScores" 
+                        v-for="(score, judgeId) in approvedScores" 
                         :key="judgeId"
                         class="judge-score"
                         :class="{
@@ -88,7 +88,7 @@
                         }"
                       >
                         <span class="judge-id">{{ getJudgeName(judgeId) }}</span>
-                        <span class="score">{{ score }}</span>
+                        <span class="score">{{ score.score }}</span>
                       </div>
                     </div>
                   </div>
@@ -149,7 +149,6 @@ const startEditing = () => {
 const saveTitle = () => {
   if (editTitle.value.trim()) {
     title.value = editTitle.value.trim()
-    // 如果需要，可以在此处将标题保存到localStorage或发送到服务器
     localStorage.setItem('competitionTitle', title.value)
   }
   isEditing.value = false
@@ -169,47 +168,55 @@ onMounted(() => {
   store.initializeSocket()
 })
 
+// 获取当前选手的评分详情
 const currentContestantDetails = computed(() => {
   return store.getContestantScoreDetails(store.currentContestant)
 })
 
+// 获取所有选手的排名
 const sortedContestants = computed(() => {
   return store.getAllContestantsRanking()
 })
 
+// 获取已审核通过的分数
+const approvedScores = computed(() => {
+  const scores = currentContestantDetails.value.allScores
+  return Object.entries(scores)
+    .filter(([_, score]) => score.approved)
+    .reduce((acc, [judgeId, score]) => {
+      acc[judgeId] = score
+      return acc
+    }, {})
+})
+
+// 判断分数是否被去除
 const isScoreRemoved = (score, details, judgeId) => {
   if (details.validScoresCount < 3) return false
   
   // 获取所有分数和评委ID
   const scores = Object.entries(details.allScores)
+    .filter(([_, s]) => s.approved)
+    .map(([id, s]) => [id, s.score])
   
   // 如果是最高分
-  if (score === details.highestScore) {
+  if (score.score === details.highestScore) {
     // 找到所有最高分的评委ID
     const highestJudges = scores
       .filter(([_, s]) => s === details.highestScore)
-      .map(([judgeId]) => judgeId)
+      .map(([id]) => id)
       .sort()
-    
-    console.log('最高分评委列表:', highestJudges)
-    console.log('当前评委ID:', judgeId)
-    console.log('是否应该显示灰色:', judgeId === highestJudges[0])
     
     // 只有当当前评委ID是最高分评委中ID最小的那个时，才显示为灰色
     return judgeId === highestJudges[0]
   }
   
   // 如果是最低分
-  if (score === details.lowestScore) {
+  if (score.score === details.lowestScore) {
     // 找到所有最低分的评委ID
     const lowestJudges = scores
       .filter(([_, s]) => s === details.lowestScore)
-      .map(([judgeId]) => judgeId)
+      .map(([id]) => id)
       .sort()
-    
-    console.log('最低分评委列表:', lowestJudges)
-    console.log('当前评委ID:', judgeId)
-    console.log('是否应该显示灰色:', judgeId === lowestJudges[0])
     
     // 只有当当前评委ID是最低分评委中ID最小的那个时，才显示为灰色
     return judgeId === lowestJudges[0]
@@ -218,12 +225,14 @@ const isScoreRemoved = (score, details, judgeId) => {
   return false
 }
 
+// 获取当前选手名称
 const getCurrentContestantName = computed(() => {
   if (!store.currentContestant) return '未知选手'
   const contestant = store.contestants.find(c => c.id === store.currentContestant)
   return contestant ? contestant.name : `选手${store.currentContestant}`
 })
 
+// 获取评委名称
 const getJudgeName = (judgeId) => {
   if (store.importedJudgeNames && store.importedJudgeNames[judgeId - 1]) {
     return store.importedJudgeNames[judgeId - 1]

@@ -2,7 +2,7 @@
   <div class="judge-view">
     <el-container>
       <el-header>
-        <h1>评委打分界面</h1>
+        <h1 style="color: black;">评委打分界面</h1>
         <div class="connection-status" :class="{ connected: store.isConnected }">
           {{ store.isConnected ? '已连接' : '未连接' }}
         </div>
@@ -10,7 +10,7 @@
 
       <el-main>
         <!-- 评委登录界面 -->
-        <div v-if="!judgeId" class="login-section">
+        <div style="color: black;" v-if="!judgeId" class="login-section">
           <h2>请选择评委编号</h2>
           <el-form :model="loginForm" label-width="120px">
             <el-form-item label="评委编号">
@@ -47,10 +47,10 @@
                 <div class="card-header">
                   <span class="contestant-name">选手: <strong>{{ getCurrentContestantName }}</strong></span>
                   <el-tag 
-                    :type="hasScored ? 'success' : 'warning'"
+                    :type="hasScored ? (currentScoreStatus === '已通过' ? 'success' : 'warning') : 'info'"
                     size="small"
                   >
-                    {{ hasScored ? '已打分' : '未打分' }}
+                    {{ hasScored ? currentScoreStatus : '未打分' }}
                   </el-tag>
                 </div>
               </template>
@@ -100,8 +100,8 @@
               <el-table-column prop="score" label="分数" width="80" />
               <el-table-column prop="status" label="状态">
                 <template #default="{ row }">
-                  <el-tag :type="row.score ? 'success' : 'info'">
-                    {{ row.score ? '已打分' : '未打分' }}
+                  <el-tag :type="row.score ? (row.status === '已通过' ? 'success' : 'warning') : 'info'">
+                    {{ row.status }}
                   </el-tag>
                 </template>
               </el-table-column>
@@ -142,16 +142,26 @@ const hasScored = computed(() => {
   return !!contestantScores[judgeId.value]
 })
 
+// 获取当前选手的评分状态
+const currentScoreStatus = computed(() => {
+  if (!store.competitionStarted || !store.currentContestant) return null
+  const contestantScores = store.scores[store.currentContestant] || {}
+  const score = contestantScores[judgeId.value]
+  if (!score) return null
+  return score.approved ? '已通过' : '待审核'
+})
+
 // 生成历史打分记录
 const scoreHistory = computed(() => {
   if (!store.contestants.length) return []
   return store.contestants.map(contestant => {
     const contestantScores = store.scores[contestant.id] || {}
+    const score = contestantScores[judgeId.value]
     return {
       contestantId: contestant.id,
       contestantName: contestant.name,
-      score: contestantScores[judgeId.value],
-      status: contestantScores[judgeId.value] ? '已打分' : '未打分'
+      score: score ? score.score : null,
+      status: score ? (score.approved ? '已通过' : '待审核') : '未打分'
     }
   })
 })
@@ -246,7 +256,6 @@ const handleLogout = () => {
   store.judgeLogout(judgeId.value)
   judgeId.value = null
   judgeName.value = null
-  ElMessage.success('已退出登录')
 }
 
 // 监听断连事件
@@ -257,64 +266,67 @@ watch(() => store.isConnected, (newVal) => {
   }
 })
 
-// 自动计算总分
-watch(
-  () => [scoreForm.value.feasibility, scoreForm.value.innovation, scoreForm.value.profession, scoreForm.value.practice],
-  ([f, i, p, pr]) => {
-    scoreForm.value.total = +(f + i + p + pr).toFixed(1)
+// 获取评委名称
+const getJudgeName = (number) => {
+  if (store.importedJudgeNames && store.importedJudgeNames[number - 1]) {
+    return store.importedJudgeNames[number - 1]
   }
-)
+  return `评委${number}号`
+}
+
+// 获取当前选手名称
+const getCurrentContestantName = computed(() => {
+  if (!store.competitionStarted || !store.currentContestant) return ''
+  const contestant = store.contestants.find(c => c.id === store.currentContestant)
+  return contestant ? contestant.name : ''
+})
+
+// 监听分数变化，自动计算总分
+watch(() => [
+  scoreForm.value.feasibility,
+  scoreForm.value.innovation,
+  scoreForm.value.profession,
+  scoreForm.value.practice
+], () => {
+  scoreForm.value.total = Number((
+    scoreForm.value.feasibility +
+    scoreForm.value.innovation +
+    scoreForm.value.profession +
+    scoreForm.value.practice
+  ).toFixed(1))
+}, { deep: true })
 
 // 提交分数
 const submitScore = () => {
-  // 校验每项分数
-  if (
-    scoreForm.value.feasibility < 0 || scoreForm.value.feasibility > 30 ||
-    scoreForm.value.innovation < 0 || scoreForm.value.innovation > 25 ||
-    scoreForm.value.profession < 0 || scoreForm.value.profession > 20 ||
-    scoreForm.value.practice < 0 || scoreForm.value.practice > 25
-  ) {
-    ElMessage.warning('请检查各项分数是否在合理区间内')
+  if (!store.competitionStarted || !store.allowScoreEdit) {
+    ElMessage.warning('当前不能提交分数')
     return
   }
-  if (
-    scoreForm.value.total !== scoreForm.value.feasibility + scoreForm.value.innovation + scoreForm.value.profession + scoreForm.value.practice
-  ) {
-    ElMessage.warning('总分有误')
+
+  if (!judgeId.value) {
+    ElMessage.warning('请先登录')
     return
   }
-  store.socket.emit('submitScore', {
+
+  const totalScore = scoreForm.value.total
+  if (totalScore < 0 || totalScore > 100) {
+    ElMessage.error('分数必须在0-100之间')
+    return
+  }
+
+  store.socket?.emit('submitScore', {
     contestantId: store.currentContestant,
     judgeId: judgeId.value,
-    score: scoreForm.value.total
+    score: totalScore
   })
 }
 
-// 确保在组件卸载时移除事件监听
+// 组件卸载时清理
 onUnmounted(() => {
-  if (store.socket) {
-    store.socket.off('submitFailed');
-    store.socket.off('submitSuccess');
-    if (judgeId.value) {
-      store.judgeLogout(judgeId.value)
-    }
+  if (judgeId.value) {
+    store.judgeLogout(judgeId.value)
   }
 })
-
-// 获取当前选手的姓名
-const getCurrentContestantName = computed(() => {
-  if (!store.currentContestant) return '未命名选手'
-  const contestant = store.contestants.find(c => c.id === store.currentContestant)
-  return contestant ? contestant.name : '未命名选手'
-})
-
-// 获取评委名称
-const getJudgeName = (judgeNumber) => {
-  if (store.importedJudgeNames && store.importedJudgeNames[judgeNumber - 1]) {
-    return store.importedJudgeNames[judgeNumber - 1]
-  }
-  return `评委 ${judgeNumber} 号`
-}
 </script>
 
 <style scoped>

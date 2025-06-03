@@ -7,7 +7,11 @@ const getServerUrl = () => {
   if (import.meta.env.VITE_SERVER_URL) {
     return import.meta.env.VITE_SERVER_URL
   }
-  // 如果没有配置环境变量，则使用当前域名
+  // 在开发环境中使用 3000 端口
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3001'
+  }
+  // 在生产环境中使用当前域名
   return window.location.origin
 }
 
@@ -24,7 +28,8 @@ export const useCompetitionStore = defineStore('competition', {
     contestants: [],
     showRanking: false, // 控制是否显示排名
     allowScoreEdit: true, // 新增：是否允许评委修改分数
-    importedJudgeNames: []
+    importedJudgeNames: [],
+    pendingScores: {} // 新增：存储待审核的评分
   }),
   
   getters: {
@@ -32,7 +37,9 @@ export const useCompetitionStore = defineStore('competition', {
     calculateFinalScore: (state) => (contestantId) => {
       console.log('开始计算选手', contestantId, '的最终得分')
       const contestantScores = Object.values(state.scores[contestantId] || {})
-      console.log('该选手的所有分数:', contestantScores)
+        .filter(score => score.approved) // 只使用已审核通过的分数
+        .map(score => score.score)
+      console.log('该选手的所有已审核分数:', contestantScores)
       
       // 如果没有分数，返回0
       if (contestantScores.length === 0) {
@@ -67,12 +74,14 @@ export const useCompetitionStore = defineStore('competition', {
     getContestantScoreDetails: (state) => (contestantId) => {
       console.log('获取选手', contestantId, '的详细得分信息')
       const contestantScores = Object.values(state.scores[contestantId] || {})
+        .filter(score => score.approved) // 只使用已审核通过的分数
+        .map(score => score.score)
       console.log('原始分数:', contestantScores)
       
       if (contestantScores.length === 0) {
         console.log('该选手暂无评分')
         return {
-          allScores: [],
+          allScores: state.scores[contestantId] || {},
           validScoresCount: 0,
           lowestScore: null,
           highestScore: null,
@@ -97,7 +106,7 @@ export const useCompetitionStore = defineStore('competition', {
       console.log('计算得到的平均分:', average.toFixed(1))
 
       return {
-        allScores: state.scores[contestantId] || {}, // 返回原始的评委-分数映射
+        allScores: state.scores[contestantId] || {},
         validScoresCount: contestantScores.length,
         lowestScore,
         highestScore,
@@ -285,5 +294,37 @@ export const useCompetitionStore = defineStore('competition', {
       this.showRanking = !this.showRanking
       this.socket?.emit('toggleRanking', { showRanking: this.showRanking })
     },
+
+    // 开始评分
+    startScoreEdit() {
+      console.log('允许评委评分')
+      this.allowScoreEdit = true
+      this.socket?.emit('startScoreEdit')
+    },
+
+    // 停止评分
+    stopScoreEdit() {
+      console.log('停止评委评分')
+      this.allowScoreEdit = false
+      this.socket?.emit('stopScoreEdit')
+    },
+
+    // 修改评分
+    updateScore(contestantId, judgeId, score) {
+      console.log('修改评分:', { contestantId, judgeId, score })
+      this.socket?.emit('updateScore', { contestantId, judgeId, score })
+    },
+
+    // 删除评分
+    deleteScore(contestantId, judgeId) {
+      console.log('删除评分:', { contestantId, judgeId })
+      this.socket?.emit('deleteScore', { contestantId, judgeId })
+    },
+
+    // 通过评分
+    approveScore(contestantId, judgeId) {
+      console.log('通过评分:', { contestantId, judgeId })
+      this.socket?.emit('approveScore', { contestantId, judgeId })
+    }
   }
 }) 
