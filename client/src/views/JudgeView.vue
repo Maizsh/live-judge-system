@@ -57,21 +57,36 @@
               
               <div class="score-input">
                 <el-form :model="scoreForm" label-position="top">
-                  <el-form-item label="可行性 (30分)">
+                  <el-form-item label="个人成长 (30分)">
                     <el-input-number v-model="scoreForm.feasibility" :min="0" :max="30" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
-                    <div class="score-desc">指对参赛项目的主要内容和配套条件,如市场需求、资源供应、资金筹措、盈利能力等,从技术、经济等方面进行调查研究和分析比较,并提出该项目是否值得投资、如何进行建设的咨询意见。优秀25-30分，良好15-25分，一般0-15分。</div>
+                    <div class="score-desc">1.立德树人。项目弘扬正确价值观，厚植家国情怀，恪守伦理规范，有助于培育创新精神。
+2.调研深入。项目扎根中国大地了解国情民情，鼓励学生深入社会、行业、实验场所选题立项、调查研究、试验论证。
+3.逻辑正确。项目符合将专业知识与商业知识有效结合并转化为商业价值或社会价值的创新创业基本过程和基本逻辑，展现创新教育对大学生基本素养和认知的塑造力。
+4.知识掌握与应用能力。项目体现团队对创新创业所需知识（专业知识、商业知识、行业知识等）与技能（计划、组织、领导、控制、创新等）的娴熟掌握；体现团队用课堂和实验室学到的知识解决实际问题的综合能力和高级思维；体现对团队成员创新精神、创新意识、创新能力的锻炼和提升作用，展现创新教育提升大学生综合能力的效力。
+5.人才培养成效。项目能充分体现院校在职业教育建设方面取得的成果；体现院校在项目的培育、孵化等方面的支持情况；体现职普融通、产教融合、科教融汇、多学科交叉、专创融合、产学研协同创新等模式在项目的产生与执行中的重要作用。
+</div>
                   </el-form-item>
-                  <el-form-item label="创新性 (25分)">
-                    <el-input-number v-model="scoreForm.innovation" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
-                    <div class="score-desc">指提交的参赛项目是否具有一定的技术含量,或具有低碳、环保、节能等方面的特色,内容、理念是否新颖。优秀20-25分，良好15-20分，一般0-15分。</div>
+                  <el-form-item label="项目创新 (30分)">
+                    <el-input-number v-model="scoreForm.innovation" :min="0" :max="30" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
+                    <div class="score-desc">1.原始创新。具有原始创意、创造。
+2.培养成效。具有面向培养“大国工匠”与能工巧匠的创意与创新。
+3.模式创新。项目体现产教融合模式创新、校企合作模式创新、工学一体模式创新。
+4.创新成效。鼓励面向职业和岗位的创意及创新，侧重于加工工艺创新、实用技术创新、产品（技术）改良、应用性优化、民生类创意等。
+</div>
                   </el-form-item>
-                  <el-form-item label="专业性 (20分)">
-                    <el-input-number v-model="scoreForm.profession" :min="0" :max="20" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
-                    <div class="score-desc">指参赛项目涉及的内容与参赛团队成员所学和擅长的专业业务、个人特长、爱好是否紧密相结合。参赛团队的组合搭配和分工在知识结构上是否科学合理。优秀15-20分，良好10-15分，一般0-10分。</div>
+                  <el-form-item label="产业价值 (25分)">
+                    <el-input-number v-model="scoreForm.profession" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
+                    <div class="score-desc">1.产业情况。充分了解所在产业（行业）的产业规模、增长速度、竞争格局、产业趋势、产业政策等情况，形成完备、深刻的产业认知。
+2.市场情况。项目具有明确的目标市场定位，对目标市场的特征、需求等情况有清晰的了解，并据此制定合理的营销、运营、财务等计划，设计出完整、创新、可行的商业模式，展现团队的商业思维。
+3.落地情况。项目落地执行情况；项目促进区域经济发展、产业转型升级的情况；已有盈利能力或盈利潜力情况。
+4.社会影响。项目直接或间接带动就业的数量和质量，对社会文明、生态文明、民生福祉等方面的积极推动作用。</div>
                   </el-form-item>
-                  <el-form-item label="实践性 (25分)">
-                    <el-input-number v-model="scoreForm.practice" :min="0" :max="25" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
-                    <div class="score-desc">指参赛团队是否具备融资、抵御风险、公司管理等能力,是否有能力将规划付诸实践。优秀20-25分，良好15-20分，一般0-15分。</div>
+                  <el-form-item label="团队协作 (15分)">
+                    <el-input-number v-model="scoreForm.practice" :min="0" :max="15" :step="0.5" :disabled="!store.allowScoreEdit" class="score-input-number" />
+                    <div class="score-desc">1.团队精神。团队的组成原则与过程是否科学合理；团队是否具有支撑项目成长的知识、技术和经验；是否有明确的使命愿景。
+2.团队结构。团队的组织构架、人员配置、分工协作、能力结构、专业结构、合作机制、激励制度等的合理性情况。
+3.团队效能。团队与项目关系的真实性、紧密性情况；对项目的各项投入情况；创立创业企业的可能性情况。
+4.团队资源。支撑项目发展的合作伙伴等外部资源的使用以及与项目关系的情况。</div>
                   </el-form-item>
                   <el-form-item label="总分">
                     <el-input-number v-model="scoreForm.total" :min="0" :max="100" :step="0.1" disabled class="score-input-number total-score" />
